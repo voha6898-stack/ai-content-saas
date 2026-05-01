@@ -64,6 +64,14 @@ export const monetizationAPI = {
   getMyLinks:        ()          => api.get('/monetization/links'),
 };
 
+export const scriptAPI = {
+  generate:       (data) => api.post('/script/generate', data),
+  getHistory:     (page = 1, limit = 8, platform = '') =>
+    api.get('/script/history', { params: { page, limit, ...(platform && { platform }) } }),
+  toggleFavorite: (id)   => api.patch(`/script/${id}/favorite`),
+  delete:         (id)   => api.delete(`/script/${id}`),
+};
+
 export const analyticsAPI = {
   getOverview: () => api.get('/analytics/overview'),
 };

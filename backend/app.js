@@ -7,6 +7,7 @@ const rateLimit     = require('express-rate-limit');
 
 const authRoutes         = require('./src/routes/auth.routes');
 const contentRoutes      = require('./src/routes/content.routes');
+const scriptRoutes       = require('./src/routes/script.routes');
 const distributionRoutes = require('./src/routes/distribution.routes');
 const pipelineRoutes     = require('./src/routes/pipeline.routes');
 const monetizationRoutes = require('./src/routes/monetization.routes');
@@ -74,6 +75,7 @@ const authLimiter = rateLimit({
 // ── Routes ────────────────────────────────────────────
 app.use('/api/auth',         authLimiter, authRoutes);
 app.use('/api/content',      contentRoutes);
+app.use('/api/script',       scriptRoutes);
 app.use('/api/distribution', distributionRoutes);
 app.use('/api/pipeline',     pipelineRoutes);
 app.use('/api/monetization', monetizationRoutes);
