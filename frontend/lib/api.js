@@ -64,6 +64,14 @@ export const monetizationAPI = {
   getMyLinks:        ()          => api.get('/monetization/links'),
 };
 
+export const growthAPI = {
+  generate:   (data) => api.post('/growth/generate', data),
+  getHistory: (page = 1, limit = 6, platform = '') =>
+    api.get('/growth/history', { params: { page, limit, ...(platform && { platform }) } }),
+  getOne:     (id)  => api.get(`/growth/${id}`),
+  delete:     (id)  => api.delete(`/growth/${id}`),
+};
+
 export const scriptAPI = {
   generate:       (data) => api.post('/script/generate', data),
   getHistory:     (page = 1, limit = 8, platform = '') =>
