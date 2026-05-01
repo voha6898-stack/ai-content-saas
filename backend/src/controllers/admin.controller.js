@@ -6,6 +6,116 @@ const PaymentRequest = require('../models/PaymentRequest.model');
 
 const PRO_DAYS = parseInt(process.env.PRO_DAYS) || 30;
 
+// ── POST /api/admin/setup-self ─────────────────────────
+// Nâng admin account lên Pro + unlimited credits
+const setupAdminSelf = async (req, res, next) => {
+  try {
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 10); // 10 năm
+
+    await User.findByIdAndUpdate(req.user.id, {
+      plan:          'pro',
+      credits:       999999,
+      planExpiresAt: expiresAt,
+    });
+
+    res.json({ success: true, message: 'Admin account đã được nâng cấp lên Pro không giới hạn.' });
+  } catch (err) { next(err); }
+};
+
+// ── GET /api/admin/users ────────────────────────────────
+const getUsers = async (req, res, next) => {
+  try {
+    const page   = parseInt(req.query.page)  || 1;
+    const limit  = parseInt(req.query.limit) || 20;
+    const search = req.query.search?.trim()  || '';
+    const plan   = req.query.plan            || '';
+    const skip   = (page - 1) * limit;
+
+    const query = {};
+    if (search) query.$or = [
+      { name:  { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+    ];
+    if (plan === 'pro' || plan === 'free') query.plan = plan;
+
+    const [users, total] = await Promise.all([
+      User.find(query).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      User.countDocuments(query),
+    ]);
+
+    // Đếm nội dung cho mỗi user
+    const userIds = users.map((u) => u._id);
+    const contentCounts = await Content.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      { $group: { _id: '$userId', count: { $sum: 1 } } },
+    ]);
+    const countMap = Object.fromEntries(contentCounts.map((c) => [c._id.toString(), c.count]));
+
+    const enriched = users.map((u) => ({
+      ...u,
+      contentCount: countMap[u._id.toString()] || 0,
+    }));
+
+    res.json({
+      success: true,
+      users:   enriched,
+      pagination: { total, page, totalPages: Math.ceil(total / limit), hasNext: page * limit < total },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── PATCH /api/admin/users/:id ──────────────────────────
+// Cập nhật plan, credits, hoặc cả hai
+const updateUser = async (req, res, next) => {
+  try {
+    const { plan, credits, addCredits } = req.body;
+    const update = {};
+
+    if (plan === 'pro') {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + PRO_DAYS);
+      update.plan          = 'pro';
+      update.credits       = 999999;
+      update.planExpiresAt = expiresAt;
+    } else if (plan === 'free') {
+      update.plan          = 'free';
+      update.planExpiresAt = null;
+    }
+
+    if (typeof credits === 'number') {
+      update.credits = Math.max(0, credits);
+    }
+
+    let user;
+    if (typeof addCredits === 'number') {
+      user = await User.findByIdAndUpdate(
+        req.params.id,
+        { ...update, $inc: { credits: addCredits } },
+        { new: true }
+      ).select('-password');
+    } else {
+      user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
+    }
+
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy user.' });
+    res.json({ success: true, message: 'Đã cập nhật user.', user });
+  } catch (err) { next(err); }
+};
+
+// ── DELETE /api/admin/users/:id ─────────────────────────
+const deleteUser = async (req, res, next) => {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL || '';
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy user.' });
+    if (user.email === adminEmail) return res.status(400).json({ success: false, message: 'Không thể xoá tài khoản admin.' });
+
+    await user.deleteOne();
+    res.json({ success: true, message: `Đã xoá tài khoản ${user.email}` });
+  } catch (err) { next(err); }
+};
+
 // ── helpers ────────────────────────────────────────────
 function headerStyle(ws, row) {
   row.eachCell((cell) => {
@@ -349,4 +459,5 @@ const rejectPaymentRequest = async (req, res, next) => {
 module.exports = {
   exportUsers, exportContent, exportFull, getStats,
   getPaymentRequests, approvePaymentRequest, rejectPaymentRequest,
+  setupAdminSelf, getUsers, updateUser, deleteUser,
 };

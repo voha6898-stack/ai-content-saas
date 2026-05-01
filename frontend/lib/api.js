@@ -111,4 +111,12 @@ export const adminPaymentAPI = {
   reject:       (id, note) => api.patch(`/admin/payment-requests/${id}/reject`, { note }),
 };
 
+export const adminAPI = {
+  setupSelf:    ()                  => api.post('/admin/setup-self'),
+  getStats:     ()                  => api.get('/admin/stats'),
+  getUsers:     (params = {})       => api.get('/admin/users', { params }),
+  updateUser:   (id, data)          => api.patch(`/admin/users/${id}`, data),
+  deleteUser:   (id)                => api.delete(`/admin/users/${id}`),
+};
+
 export default api;
