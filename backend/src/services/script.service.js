@@ -2,146 +2,257 @@ const { aiClient, aiModel } = require('./ai.service');
 const Script = require('../models/Script.model');
 const User   = require('../models/User.model');
 
-// ── Prompts theo platform ─────────────────────────────────────────────────────
+// ── SCRIPTA Agent Identity ────────────────────────────────────────────────────
+
+const SCRIPTA_SYSTEM = `Bạn là SCRIPTA — Master Screenwriter & Director Agent, AI biên kịch và đạo diễn đẳng cấp thế giới.
+
+DANH TÍNH CHUYÊN MÔN:
+• Biên kịch 500+ video triệu view trên YouTube, TikTok, Facebook tại thị trường Việt Nam và Đông Nam Á
+• Nghiên cứu sâu về neuroscience of attention: cách não người xử lý thông tin, quyết định xem tiếp hay bỏ qua
+• Thành thạo Hollywood 3-Act Structure, Save the Cat beat sheet, Story Circle của Dan Harmon — ứng dụng cho short-form và long-form content
+• Hiểu rõ thuật toán từng nền tảng: YouTube reward watch-time + CTR, TikTok reward completion rate + re-watches, Facebook reward comment depth + shares
+• Chuyên gia về attention curve engineering: biết chính xác giây nào người xem có xu hướng bỏ đi và cách phòng ngừa
+• Nắm vững cinematic language: góc máy, ánh sáng, chuyển cảnh, âm thanh — tất cả ảnh hưởng đến cảm xúc người xem
+
+TRIẾT LÝ BIÊN KỊCH SCRIPTA:
+Một kịch bản xuất sắc không chỉ là "nói gì" mà là "cảm xúc nào được kích hoạt, vào đúng giây nào, theo đúng trình tự nào."
+
+NGUYÊN TẮC TƯ DUY 5 LỚP:
+Trước khi viết từng scene, SCRIPTA phân tích:
+1. NEUROLOGICAL TRIGGER: Cơ chế tâm lý nào được kích hoạt? (Dopamine anticipation, Fear of missing out, Social comparison, Curiosity gap, Pattern interrupt)
+2. EMOTIONAL BEAT: Cảm xúc người xem trải qua trong cảnh này? (Shock → Tò mò → Đồng cảm → Hứng khởi → Thôi thúc hành động)
+3. ALGORITHM SIGNAL: Scene này đóng góp gì cho thuật toán? (Watch-time retention, Re-watch trigger, Share-worthy moment, Save-worthy insight)
+4. CINEMATIC IMPACT: Hình ảnh/âm thanh nào tối đa hóa hiệu quả của kịch bản?
+5. CONTINUITY HOOK: Cuối scene này có gì khiến người xem PHẢI xem scene tiếp theo?
+
+TIÊU CHUẨN CHẤT LƯỢNG KHÔNG THƯƠNG LƯỢNG:
+• Hook phải khiến người xem DỪNG ngón tay trong 0.3 giây đầu tiên — không phải 3 giây, không phải 1 giây
+• Mỗi câu thoại phải có mục đích: không có câu nào "làm đầy" hay "chuyển tiếp" vô nghĩa
+• Direction notes phải đủ cụ thể để cameraman thực hiện ngay mà không cần hỏi thêm
+• Overlay text phải tối ưu cho người xem tắt tiếng (40% người xem TikTok/Facebook không bật âm)
+• Script phải đọc nghe TỰ NHIÊN như lời nói thật — không ai nói như đang đọc bài
+• KHÔNG BAOGIỜ bắt đầu bằng: "Xin chào", "Hôm nay mình", "Trong video này", "Bắt đầu nào"
+
+Luôn trả về JSON hợp lệ, đầy đủ, không thêm text ngoài JSON.`;
+
+// ── Platform-specific prompts ─────────────────────────────────────────────────
 
 const buildYouTubePrompt = (topic, duration, style) => {
-  const sceneCount = { '5 phút': 6, '10 phút': 9, '15 phút': 12 }[duration] || 6;
-  const maxTokens  = { '5 phút': 3500, '10 phút': 4000, '15 phút': 4500 }[duration] || 3500;
+  const sceneCount = { '5 phút': 7, '10 phút': 10, '15 phút': 13 }[duration] || 7;
+  const maxTokens  = { '5 phút': 4000, '10 phút': 4500, '15 phút': 5000 }[duration] || 4000;
 
   const styleGuide = {
-    storytelling: 'Kể chuyện cá nhân — bắt đầu bằng trải nghiệm thực tế, dẫn dắt cảm xúc, kết thúc bằng bài học sâu sắc.',
-    tutorial:     'Hướng dẫn từng bước — rõ ràng, có ví dụ thực tế, dễ làm theo, kèm mẹo nâng cao.',
-    listicle:     'Top danh sách — đánh số từng điểm, mỗi điểm có tiêu đề hấp dẫn và ví dụ cụ thể.',
-    review:       'Đánh giá/So sánh — trình bày ưu nhược điểm rõ ràng, dẫn chứng thực tế, kết luận mạnh.',
-  }[style] || styleGuide.tutorial;
+    storytelling: `STORYTELLING MODE — Narrative Engineering:
+    • Mở bằng cảnh in medias res (giữa chừng câu chuyện, đang xảy ra căng thẳng)
+    • Xây dựng emotional stakes rõ ràng trong 60 giây đầu: tại sao người xem phải quan tâm?
+    • Sử dụng "moment of vulnerability" để tạo connection sâu
+    • Pattern: Hook Story → Stakes Setting → Journey Begin → Obstacles → Revelation → Resolution → Lesson + CTA
+    • Mỗi act kết thúc bằng cliffhanger nhỏ giữ watch-time`,
+    tutorial: `TUTORIAL MODE — Authority & Value Engineering:
+    • Mở bằng result preview (cho xem kết quả cuối trước) → tạo dopamine anticipation
+    • "Bằng chứng xác thực" trong 30 giây: con số cụ thể, kết quả thực tế, social proof
+    • Cấu trúc: Problem agitation → Promise → Proof → Process (step-by-step) → Payoff
+    • Mỗi step phải có micro-win: người xem cảm thấy có thể làm được ngay
+    • Pattern interrupt mỗi 2 phút: câu hỏi bất ngờ, sự thật phản trực giác, case study shock`,
+    listicle: `LISTICLE MODE — Curiosity Gap Engineering:
+    • Announce số lượng items ngay đầu + tease item shock nhất (không phải item 1)
+    • "Item #X sẽ làm bạn ngạc nhiên nhất" — tạo reason to watch till end
+    • Mỗi item: Title → Shock stat/fact → Explanation → Ví dụ cụ thể → Mini-transition
+    • Escalating value: item sau phải "giá trị hơn" hoặc "bất ngờ hơn" item trước
+    • Cuối: "Bonus item" không được đề cập trước — reward cho người xem hết`,
+    review: `REVIEW MODE — Verdict Engineering:
+    • Mở bằng controversial verdict ngay (không build-up dài dòng)
+    • Establish credibility cụ thể: "Tôi đã dùng X trong Y tháng / bỏ Z tiền mua"
+    • Pattern: Verdict → Evidence → Counterargument → Final verdict với nuance
+    • So sánh "before/after" hoặc "vs competitor" với data cụ thể
+    • Cuối: recommendation rõ ràng cho từng loại người xem khác nhau`,
+  }[style] || `Tutorial mode với value engineering và authority building`;
 
   return {
-    prompt: `Bạn là biên kịch YouTube chuyên nghiệp Việt Nam với 10 năm kinh nghiệm tạo video triệu view.
-Tạo KỊCH BẢN VIDEO YOUTUBE CHUYÊN SÂU cho chủ đề: "${topic}"
+    prompt: `Tạo KỊCH BẢN VIDEO YOUTUBE ĐẲNG CẤP THẾ GIỚI cho chủ đề: "${topic}"
 Thời lượng: ${duration} | Phong cách: ${styleGuide}
 
-QUY TẮC BẮT BUỘC:
-- Script là LỜI THOẠI THỰC TẾ — từng câu hoàn chỉnh, nói được ngay
-- KHÔNG dùng "Xin chào mọi người" hay "Hôm nay mình sẽ"
-- Hook 15 giây đầu phải gây shock hoặc tạo câu hỏi không thể không xem tiếp
-- Mỗi scene có timestamp chính xác, tính liên tục
-- Ngôn ngữ tự nhiên, tiếng Việt đời thường, gen Z friendly
-- Có ${sceneCount} scenes với đủ các loại: hook, problem, tease, content (nhiều nhất), cta, outro
+NHIỆM VỤ SCRIPTA:
+Viết kịch bản với ${sceneCount} scenes, mỗi scene được engineering kỹ lưỡng để maximize watch-time retention.
+Hook phải nằm trong TOP 5% nội dung viral YouTube — không chấp nhận hook trung bình.
+Lời thoại phải tự nhiên như đang nói chuyện thật, không phải đọc bài.
 
-Trả về JSON ĐÚNG định dạng sau (không thêm text ngoài JSON):
+CHI TIẾT BẮT BUỘC TRONG TỪNG SCENE:
+- "psychTrigger": Tên cụ thể của cơ chế tâm lý (VD: "Curiosity Gap + FOMO", "Pattern Interrupt", "Social Proof Cascade")
+- "retentionRole": Scene này giữ/lấy lại attention như thế nào?
+- Script phải dài đủ (scene content tối thiểu 80-120 từ, hook tối thiểu 30-40 từ)
+- Direction phải cụ thể đến mức cameraman không cần hỏi thêm
+
+Trả về JSON hợp lệ:
 {
-  "title": "Tiêu đề video viral 55-65 ký tự, VIẾT HOA chữ đầu mỗi từ quan trọng",
+  "title": "Tiêu đề YouTube 55-65 ký tự, có trigger word (Sự thật / Bí mật / Cảnh báo / Tại sao / Đừng / X điều), VIẾT HOA chữ đầu từ quan trọng",
   "totalDuration": "${duration}",
   "scenes": [
     {
       "id": 1,
-      "name": "TÊN CẢNH (vd: HOOK, VẤN ĐỀ, HỨA HẸN, ĐIỂM 1, ĐIỂM 2, CAO TRÀO, CTA, OUTRO)",
-      "timestamp": "00:00 - 00:15",
-      "duration": "15 giây",
+      "name": "TÊN CẢNH VIẾT HOA (VD: PATTERN INTERRUPT HOOK / EMOTIONAL STAKES / VIRAL REVELATION / AUTHORITY BUILD / POWER CTA)",
+      "timestamp": "00:00 - 00:20",
+      "duration": "20 giây",
       "type": "hook",
-      "script": "Lời thoại đầy đủ từng câu, dài ít nhất 3-5 câu cho mỗi scene content",
-      "direction": "Ghi chú cách quay/diễn xuất/góc máy/ánh sáng",
-      "overlay": "Text hiển thị trên màn hình hoặc đồ họa cần thêm"
+      "psychTrigger": "Cơ chế tâm lý cụ thể đang kích hoạt",
+      "retentionRole": "Scene này giữ/tạo attention bằng cách nào",
+      "script": "Lời thoại đầy đủ, tự nhiên, từng câu hoàn chỉnh. Phải đủ dài và chi tiết — người đọc script này phải có thể nói ngay không cần chuẩn bị thêm. Không có câu nào mơ hồ hay placeholder.",
+      "direction": "Góc máy: [cụ thể]. Ánh sáng: [cụ thể]. Movement: [cụ thể]. Expression: [cụ thể]. B-roll gợi ý: [cụ thể].",
+      "overlay": "Text hiển thị trên màn hình + timing xuất hiện + font style gợi ý (nếu cần)"
     }
   ],
-  "hashtags": ["#tag1", "#tag2"],
-  "productionTips": ["Mẹo quay/dựng video thực tế tip 1", "Tip 2", "Tip 3"]
+  "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
+  "productionTips": [
+    "Tip kỹ thuật quay/dựng cụ thể nhất giúp video này tối ưu thuật toán YouTube",
+    "Tip về thumbnail engineering cho video này",
+    "Tip về timing đăng và audience retention optimization"
+  ]
 }`,
     maxTokens,
   };
 };
 
 const buildTikTokPrompt = (topic, duration, style) => {
-  const sceneCount = { '30 giây': 4, '60 giây': 6, '90 giây': 8 }[duration] || 6;
-  const maxTokens  = 2500;
+  const sceneCount = { '30 giây': 5, '60 giây': 7, '90 giây': 9 }[duration] || 7;
+  const maxTokens  = 3000;
 
   const styleGuide = {
-    tutorial:     'Hướng dẫn nhanh — mỗi bước cực ngắn, có visual rõ ràng, info-dense.',
-    story:        'Câu chuyện/POV — relatable, twist bất ngờ, kết thúc gây cảm xúc mạnh.',
-    trending:     'Theo trend — áp dụng trend TikTok hiện tại, sound viral, transition mượt.',
-    skit:         'Kịch ngắn hài hước — nhân vật rõ ràng, tình huống buồn cười, punch line cuối.',
-  }[style] || styleGuide.tutorial;
+    tutorial: `TUTORIAL MODE — TikTok Learn Formula:
+    • Giây 0-2: Shock result / Unbelievable fact → "Không ai nói với bạn điều này về [topic]"
+    • Giây 2-5: Promise cụ thể → "Làm theo đúng 3 bước này, kết quả trong 24h"
+    • Mỗi step: 1 hành động = 1 shot = tối đa 3 giây
+    • Phải có "Save this!" moment: thông tin quá dense, quá giá trị → buộc phải lưu
+    • Cuối: Kết quả cụ thể + prompt để comment (controversy hoặc curiosity)`,
+    story: `STORY MODE — POV Emotional Journey:
+    • Giây 0-2: In medias res — đang ở giữa tình huống cao trào, không giải thích
+    • Build tension qua micro-expressions và environment cues, không exposition dài
+    • Phải có TWIST: không đoán được từ đầu, nhưng nhìn lại thấy hoàn toàn logic
+    • Emotional payoff phải đủ mạnh để người xem PHẢI comment và tag bạn bè
+    • POV framing: người xem = nhân vật, không phải observer`,
+    trending: `TRENDING MODE — Algorithm Surfing:
+    • Áp dụng sound viral hiện tại với lip-sync hoặc reaction timing chính xác
+    • Trend format + original twist unique = viral recipe
+    • Transition phải "satisfying" — trigger re-watch instinctively
+    • Stitch/Duet bait: tạo nội dung người khác muốn react/respond
+    • Comment bait cuối: câu hỏi chia đội, "Team A hay Team B?"`,
+    skit: `SKIT MODE — Character Comedy Engineering:
+    • Nhân vật phải có distinct personality trong 2 giây — không cần giới thiệu
+    • Setup → Escalation → Subverted Expectation → Punch line phải hit trong 3 giây cuối
+    • Relatable situation + absurd twist = share-worthy formula
+    • Facial expression và body language = 70% của comedy — direction phải siêu cụ thể
+    • Tag-bait ending: "Tag người bạn biết y hệt thế này"`,
+  }[style] || `Tutorial mode với TikTok Learn formula`;
 
   return {
-    prompt: `Bạn là TikToker Việt Nam chuyên nghiệp với 5 triệu followers.
-Tạo KỊCH BẢN TIKTOK PHÂN CẢNH CHI TIẾT cho chủ đề: "${topic}"
+    prompt: `Tạo KỊCH BẢN TIKTOK TRIỆU VIEW cho chủ đề: "${topic}"
 Thời lượng: ${duration} | Phong cách: ${styleGuide}
 
-QUY TẮC BẮT BUỘC:
-- Mỗi dòng script = 1 hành động/câu nói (tối đa 2-3 giây mỗi shot)
-- Giây 0-2: HOOK TUYỆT ĐỐI — không được bắt đầu bằng "Xin chào" hay giới thiệu
-- Phải có "save-worthy moment" — thông tin quá giá trị khiến người xem muốn lưu lại
-- Ngôn ngữ gen Z, slang tự nhiên, emoji trong overlay
-- Có ${sceneCount} scenes, thời gian cộng dồn đúng với ${duration}
+NHIỆM VỤ SCRIPTA:
+${sceneCount} scenes, mỗi scene tối đa 2-4 giây — tốc độ TikTok không cho phép shot dài hơn.
+Hook 0-2 giây phải nằm trong TOP 3% TikTok hook chất lượng.
+40% người xem TikTok không bật âm → overlay text phải kể được câu chuyện đầy đủ.
 
-Trả về JSON ĐÚNG định dạng sau:
+CHI TIẾT BẮT BUỘC:
+- "scrollStopper": Yếu tố cụ thể khiến ngón tay dừng lại trong scene này
+- Transition giữa scenes phải "satisfying" — ghi rõ loại transition
+- Script ngắn, mạnh — từng từ phải có tác dụng
+
+Trả về JSON hợp lệ:
 {
-  "title": "Caption TikTok viral tối đa 100 ký tự, có emoji, kết bằng câu hỏi hoặc cliffhanger",
+  "title": "Caption TikTok tối đa 100 ký tự: hook sentence + emoji + câu hỏi hoặc cliffhanger để tăng comment",
   "totalDuration": "${duration}",
   "scenes": [
     {
       "id": 1,
-      "name": "TÊN CẢNH (HOOK / SETUP / ĐIỂM 1 / SAVE-WORTHY / TWIST / CTA)",
+      "name": "TÊN CẢNH (SCROLL STOPPER HOOK / PROMISE / STEP 1 / SAVE-WORTHY MOMENT / PATTERN INTERRUPT / VIRAL TWIST / COMMENT BAIT CTA)",
       "timestamp": "0:00 - 0:03",
       "duration": "3 giây",
       "type": "hook",
-      "script": "Lời nói/hành động chính xác từng từ",
-      "direction": "Camera: góc quay, movement, transition effect nên dùng",
-      "overlay": "Text overlay + emoji hiển thị trên màn hình"
+      "scrollStopper": "Yếu tố cụ thể giữ/lấy lại attention trong scene này",
+      "script": "Lời nói/hành động chính xác từng từ — ngắn, punch, không có từ thừa",
+      "direction": "Góc máy [cụ thể] + Movement [cụ thể] + Transition vào/ra [cụ thể] + Expression [cụ thể]",
+      "overlay": "Text overlay chính xác + emoji + xuất hiện lúc nào trong scene"
     }
   ],
-  "hashtags": ["#xuhuong", "#viral", "#fyp", "#LearnOnTikTok"],
-  "productionTips": ["Tip quay TikTok 1", "Tip 2", "Tip 3"]
+  "hashtags": ["#xuhuong", "#viral", "#fyp", "#LearnOnTikTok", "#foryou", "#trending"],
+  "productionTips": [
+    "Tip về lighting/setup cụ thể nhất để tăng watch-time TikTok",
+    "Tip về sound selection để maximize FYP distribution",
+    "Tip về posting time và engagement strategy đầu 30 phút"
+  ]
 }`,
     maxTokens,
   };
 };
 
 const buildFacebookPrompt = (topic, duration, style) => {
-  const maxTokens = { 'Bài viết': 2000, 'Reel 60 giây': 2500, 'Video 5 phút': 3500 }[duration] || 2500;
+  const maxTokens = { 'Bài viết': 2500, 'Reel 60 giây': 3000, 'Video 5 phút': 4000 }[duration] || 2500;
 
   const styleGuide = {
-    storytelling: 'Kể chuyện cá nhân — mở đầu bằng "hook story", dẫn cảm xúc, bài học sâu sắc.',
-    educational:  'Giáo dục/Chia sẻ — thông tin hữu ích, dẫn chứng, actionable tips.',
-    motivational: 'Truyền cảm hứng — cảm xúc mạnh, relatable, thúc đẩy hành động.',
-  }[style] || styleGuide.storytelling;
+    storytelling: `STORYTELLING MODE — Facebook Emotional Cascade:
+    • Dòng đầu tiên (trước "Xem thêm"): phải gây SHOCK hoặc tạo CURIOSITY GAP không thể cưỡng lại
+    • 50 từ đầu tiên = make or break — phải chứa emotional hook và promise
+    • Cấu trúc cảm xúc: Shock → Đồng cảm → Tension → Relief/Insight → Inspiration → Call to Action
+    • "Twist moment" ở đoạn giữa: sự thật bất ngờ đảo lộn nhận thức
+    • Câu hỏi cuối phải chia đội hoặc chạm vào điều ai cũng có ý kiến`,
+    educational: `EDUCATIONAL MODE — Value Bomb Engineering:
+    • Mở bằng counterintuitive insight: điều ngược với common knowledge
+    • Structure: Myth Bust → True Insight → Proof → Application → Actionable Tip
+    • Mỗi đoạn có 1 "quotable moment" — câu người ta muốn copy-paste chia sẻ
+    • Data và con số cụ thể tạo authority — không dùng "nhiều", "ít", "thường"
+    • Kết với câu hỏi kích thích debate: "Bạn nghĩ cách nào hiệu quả hơn?"`,
+    motivational: `MOTIVATIONAL MODE — Transformation Story Engineering:
+    • Mở bằng universal pain point: điều mà 80% người đọc đang cảm thấy ngay lúc này
+    • Journey: Đau → Nhận ra → Thay đổi → Kết quả cụ thể (không mơ hồ)
+    • Dùng "bạn" liên tục — tạo cảm giác đang nói riêng với từng người
+    • Moment of raw honesty: chia sẻ thất bại thật → tạo credibility và connection
+    • CTA không phải "like/share" mà là hành động cụ thể thay đổi được cuộc sống`,
+  }[style] || `Storytelling mode với emotional cascade engineering`;
 
   return {
-    prompt: `Bạn là chuyên gia content Facebook Marketing Việt Nam với 10 năm kinh nghiệm, đã có hàng trăm bài đạt 10.000+ share.
-Tạo KỊCH BẢN FACEBOOK PHÂN ĐOẠN CHI TIẾT cho chủ đề: "${topic}"
+    prompt: `Tạo KỊCH BẢN/NỘI DUNG FACEBOOK VIRAL LEVEL cho chủ đề: "${topic}"
 Định dạng: ${duration} | Phong cách: ${styleGuide}
 
-QUY TẮC BẮT BUỘC:
-- Dòng đầu tiên (trước "Xem thêm") phải kéo người đọc KHÔNG THỂ bỏ qua
-- KHÔNG bắt đầu bằng "Xin chào mọi người" hay "Hôm nay mình muốn chia sẻ"
-- Ngôn ngữ đời thường, chân thật, không marketing rõ ràng
-- Mỗi đoạn (scene) có mục tiêu cảm xúc rõ ràng: gây tò mò → đồng cảm → thuyết phục → hành động
-- Có câu hỏi kích comment ở cuối
+NHIỆM VỤ SCRIPTA:
+Facebook thuật toán 2024 reward: comment threads dài, shares với comment, time-on-page cao.
+Nội dung phải engineering để trigger TẤT CẢ 3 signals này.
+Dòng đầu tiên là TÀI SẢN QUAN TRỌNG NHẤT — viết như thể đây là câu duy nhất người ta đọc.
 
-Trả về JSON ĐÚNG định dạng sau:
+CHI TIẾT BẮT BUỘC:
+- "emotionalBeat": Cảm xúc đang được kỹ thuật khai thác trong scene/đoạn này
+- "algorithmSignal": Tín hiệu thuật toán Facebook nào đang được tối ưu
+- Script phải viết được đăng lên Facebook ngay — không phải outline hay gợi ý
+
+Trả về JSON hợp lệ:
 {
-  "title": "Dòng đầu tiên của bài — phải gây shock hoặc tạo tò mò ngay lập tức",
+  "title": "Dòng đầu tiên của bài — 1 câu, tối đa 15 từ, PHẢI gây shock hoặc curiosity gap cực mạnh, KHÔNG được bắt đầu bằng 'Xin chào' hay 'Hôm nay'",
   "totalDuration": "${duration}",
   "scenes": [
     {
       "id": 1,
-      "name": "TÊN ĐOẠN (HOOK / CÂU CHUYỆN / VẤN ĐỀ / GIẢI PHÁP / KÊU GỌI HÀNH ĐỘNG)",
+      "name": "TÊN ĐOẠN (SCROLL-STOPPING HOOK / EMOTIONAL SETUP / TENSION BUILD / TWIST REVELATION / VALUE BOMB / DEBATE-TRIGGER CTA)",
       "timestamp": "Đoạn 1",
-      "duration": "~50 từ",
+      "duration": "~60-80 từ",
       "type": "hook",
-      "script": "Nội dung đầy đủ của đoạn này — viết như bài thực sự đăng lên Facebook",
-      "direction": "Gợi ý: ảnh/video kèm theo, emoji nên dùng ở đây",
-      "overlay": "Caption ngắn nếu đăng kèm ảnh/video"
+      "emotionalBeat": "Cảm xúc cụ thể đang được khai thác: Shock / Đồng cảm / Tò mò / Hứng khởi / Tức giận tích cực",
+      "algorithmSignal": "Tín hiệu thuật toán: Comment trigger / Share trigger / Time-on-page / Emotional reaction",
+      "script": "Nội dung đầy đủ của đoạn này — viết như bài thực sự đăng lên Facebook. Mỗi câu có mục đích. Ngôn ngữ tự nhiên, đời thường, chân thật. Tối thiểu 60 từ cho đoạn content chính.",
+      "direction": "Ảnh/video kèm theo gợi ý: [mô tả cụ thể]. Emoji nên dùng: [cụ thể]. Format: [paragraph / bullet / mixed]",
+      "overlay": "Caption ngắn nếu đăng kèm ảnh/video — tối đa 10 từ, punch line"
     }
   ],
-  "hashtags": ["#cuocsong", "#kinhnghiem"],
-  "productionTips": ["Tip đăng bài hiệu quả 1", "Tip 2", "Tip 3"]
+  "hashtags": ["#cuocsong", "#kinhnghiem", "#succes", "#motivation", "#vietnam"],
+  "productionTips": [
+    "Tip về thời điểm đăng và cách seed engagement trong 1h đầu",
+    "Tip về visual/thumbnail nếu là video/reel",
+    "Tip về reply comment strategy để boost phân phối"
+  ]
 }`,
     maxTokens,
   };
 };
 
-// ── Main generator ────────────────────────────────────────────────────────────
+// ── AI call with retry ────────────────────────────────────────────────────────
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -150,10 +261,10 @@ const callAI = async (prompt, maxTokens, attempt = 1) => {
     const resp = await aiClient.chat.completions.create({
       model:           aiModel,
       messages: [
-        { role: 'system', content: 'Bạn là chuyên gia biên kịch nội dung viral Việt Nam. Luôn trả lời bằng JSON hợp lệ, kịch bản chất lượng cao, chi tiết, có tính viral thực sự.' },
-        { role: 'user', content: prompt },
+        { role: 'system', content: SCRIPTA_SYSTEM },
+        { role: 'user',   content: prompt },
       ],
-      temperature:     0.85,
+      temperature:     0.88,
       max_tokens:      maxTokens,
       response_format: { type: 'json_object' },
     });
@@ -162,7 +273,7 @@ const callAI = async (prompt, maxTokens, attempt = 1) => {
     const status = err.status || err.response?.status;
     if (status === 429 && attempt <= 3) {
       const wait = Math.pow(2, attempt) * 5000;
-      console.warn(`⚠️  Script AI 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
+      console.warn(`⚠️  SCRIPTA 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
       await sleep(wait);
       return callAI(prompt, maxTokens, attempt + 1);
     }
@@ -174,6 +285,8 @@ const callAI = async (prompt, maxTokens, attempt = 1) => {
     throw err;
   }
 };
+
+// ── Main generator ────────────────────────────────────────────────────────────
 
 const generateScript = async (userId, topic, platform, duration, style) => {
   const user = await User.findById(userId);
