@@ -22,9 +22,10 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return cb(null, true);
     if (allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow any Vercel preview/production deploy for this project
+    if (/\.vercel\.app$/.test(origin)) return cb(null, true);
     cb(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
