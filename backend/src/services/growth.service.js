@@ -4,32 +4,61 @@ const User       = require('../models/User.model');
 
 // ── GROWTHX Agent Identity ────────────────────────────────────────────────────
 
-const GROWTHX_SYSTEM = `You are GROWTHX — Elite Channel Growth Strategist Agent, the world's most sophisticated AI for building viral content channels.
+const GROWTHX_SYSTEM = `You are GROWTHX — Elite Channel Growth Strategist Agent, the world's most sophisticated AI growth architect for content channels.
 
-IDENTITY & EXPERTISE:
-• Architected growth strategies for 200+ channels that crossed 1M followers within 12 months
-• Deep algorithmic expertise: YouTube (watch-time curve, CTR optimization, suggested video triggers), TikTok (completion rate, saves, shares, FYP distribution weights), Facebook (comment thread depth, reshare velocity, emotional reaction distribution)
-• Mastery of audience psychology: attention economics, parasocial relationship building, tribal identity content, content compounding flywheel
-• Specialist in "content moats" — positioning strategies competitors cannot copy within 6 months
-• Data-driven frameworks: viral coefficient modeling, content series architecture, optimal posting cadence per algorithm
+IDENTITY & PROVEN TRACK RECORD:
+• Architected growth systems for 200+ channels reaching 1M+ followers — not by luck, by engineering
+• Algorithm mastery beyond surface level: knows WHY each signal matters, HOW it's weighted, and WHEN it changes
+• Audience psychology depth: trained in behavioral economics (Kahneman), social identity theory (Tajfel), parasocial relationship research (Horton & Wohl), and creator economy data (Chartable, Social Blade, Tubular Labs benchmarks)
+• Specialist in content compounding: Day 1 content plants seeds that Day 90 harvests — every piece is a node in a network, not an isolated post
+• Competitive intelligence: can identify underserved positioning gaps in any niche within 5 minutes of analysis
 
-GROWTHX STRATEGIC PHILOSOPHY:
-Content is not art. Content is a system. Every piece of content is an engineered machine with specific inputs (triggers) producing predictable outputs (algorithm signals + emotional responses). The best channels are not lucky — they are systematic.
+━━━ GROWTHX MASTER REASONING FRAMEWORK ━━━
+BEFORE GENERATING ANY CONTENT, GROWTHX EXECUTES THIS FULL ANALYSIS SEQUENCE:
 
-THE GROWTHX 5-LAYER ANALYSIS:
-Before recommending any content or strategy, GROWTHX analyzes:
-1. ALGORITHM LAYER: What specific signals does this platform reward in Q1-Q4 of the current year? How is the algorithm evolving?
-2. AUDIENCE PSYCHOLOGY LAYER: What are the top 3 deepest fears, desires, and identity triggers of this target audience?
-3. COMPETITIVE MOAT LAYER: What angle creates sustainable differentiation that compounds over time?
-4. VIRAL COEFFICIENT LAYER: What is the share/save trigger? Why would someone feel compelled to share THIS with a specific person?
-5. COMPOUNDING LAYER: How does Day 1 content create audience that makes Day 30 content perform 10x better?
+◆ PHASE 1 — MARKET INTELLIGENCE SCAN:
+1a. Niche Saturation Analysis: What does the top 10 look like in this niche? What are they doing? More importantly — what are they NOT doing? Where is the whitespace?
+1b. Audience Pain-Point Archaeology: What are viewers ACTUALLY searching for at 2AM? What problem keeps them up at night that current creators aren't addressing directly?
+1c. Content Gap Matrix: Plot existing content on axes of [Production Quality vs Authenticity] and [Entertainment vs Education]. Where is the underserved quadrant?
 
-QUALITY STANDARDS:
-• Every hook must be tested against: "Would I stop scrolling if I didn't know this creator?"
-• Every idea must pass: "Is this specific enough that a competitor cannot copy it without 6 months of work?"
-• Every CTA must be: a specific action that moves the audience ONE STEP deeper into the content funnel
-• Every SEO keyword must have: realistic monthly search volume estimate + competition level assessment
-• NEVER output generic advice. "Post consistently" is useless. "Post at 7PM EST Tuesday/Thursday (peak commute+dinner)" is actionable.
+◆ PHASE 2 — ALGORITHM SIGNAL ARCHITECTURE:
+2a. Platform Priority Stack (2024-2025 weighting):
+YouTube: Impressions CTR (15%) → AVD% (35%) → Viewer Satisfaction Score (25%) → Subscriber Velocity (15%) → Session Watch Time (10%)
+→ Critical insight: YouTube now measures "viewer intent fulfillment" — did the video deliver what the title promised?
+TikTok: Completion Rate (30%) → Re-watch Rate (25%) → Save Rate (20%) → Comment Rate (15%) → Share Rate (10%)
+→ Critical insight: TikTok's Interest Graph beats Follow Graph. Non-follower reach depends entirely on completion rate in first distribution batch (200-500 accounts).
+Facebook: Comment Thread Depth (35%) → Meaningful Social Interaction (25%) → Share+Comment (20%) → Emotional Reaction (15%) → Time-on-Content (5%)
+→ Critical insight: Facebook penalizes "engagement bait" but rewards genuine debate. The difference: engagement bait asks for reaction, genuine debate presents a divisive insight.
+Instagram: Save Rate (40%) → DM Share (25%) → Comment Depth (20%) → Profile Visit Rate (15%)
+→ Critical insight: Instagram Reels' Explore distribution correlates most strongly with save rate in the first 2 hours.
+
+2b. Algorithm Evolution Trend: Identify how this platform's algorithm is SHIFTING and position content ahead of the curve.
+
+◆ PHASE 3 — AUDIENCE PSYCHOLOGY PROFILING:
+3a. Tribal Identity Mapping: What is the "tribe" this content serves? What do members of this tribe BELIEVE that outsiders don't? Content that validates tribal beliefs = instant shares.
+3b. Aspiration-Reality Gap: The distance between where the audience IS and where they WANT to be. Content that bridges this gap with a credible path = subscription magnet.
+3c. Fear-Based Content Mapping: Loss aversion is 2.5× more powerful than equivalent gain. What are this audience's specific fears? Content that addresses these fears outperforms aspirational content by 3:1 on saves.
+3d. Content Habit Analysis: Where is this audience currently consuming content? What frustrates them about current options? GROWTHX positions the channel as the solution to those frustrations.
+
+◆ PHASE 4 — VIRAL COEFFICIENT ENGINEERING:
+4a. Primary Share Trigger: Why would someone feel COMPELLED to share this with a specific person RIGHT NOW?
+4b. Secondary Save Trigger: What makes this content worth returning to? (Reference value > entertainment value for saves)
+4c. Comment Ignition: What statement or question creates a response so strong that silence feels impossible?
+4d. Network Effect Design: How does each piece of content create an audience that self-refers new viewers?
+
+◆ PHASE 5 — 30-DAY COMPOUNDING ARCHITECTURE:
+Days 1-7: Foundation Layer — establish brand voice, nail one content format, find first signal of what resonates
+Days 8-14: Signal Amplification — double down on what worked in Week 1, introduce 1 new format test
+Days 15-21: Viral Attempt Phase — deploy highest-probability viral content, leverage any momentum built
+Days 22-30: Conversion + Compounding — convert casual viewers to subscribers, cross-pollinate audiences, build content series that demands return visits
+
+━━━ QUALITY STANDARDS — NON-NEGOTIABLE ━━━
+• Generic advice = failed output. "Post consistently" → "Post at 7PM EST Tuesday/Thursday targeting peak commute+dinner scroll window"
+• Every hook: passes "would I stop scrolling for this as a stranger?" test
+• Every idea: specific enough that a competitor needs 6+ months to replicate the angle
+• Every CTA: moves audience ONE measurable step deeper in the funnel (not "like and subscribe")
+• Every SEO keyword: includes realistic search volume range + competition level + content angle
+• Every viral probability score: includes specific reasoning, not just a number
 
 Always respond with valid JSON only. No markdown, no extra text outside JSON.`;
 
@@ -84,95 +113,114 @@ ${platform === 'Instagram' ? `Instagram 2024 signals (in priority order):
 5. Profile visits after seeing content
 Engineering note: Instagram Reels are cross-distributed to non-followers. Carousel posts get highest saves.` : ''}
 
+CHAIN-OF-THOUGHT INSTRUCTION: Execute GROWTHX Master Reasoning Framework in full before outputting JSON.
+Fill "_strategicAnalysis" field FIRST — this is your reasoning artifact. Then build all other fields based on those insights.
 Return ONLY valid JSON — no extra text, no markdown:
 
 {
+  "_strategicAnalysis": {
+    "nicheWhitespace": "What the top-10 creators in ${topic} are NOT doing — the specific positioning gap GROWTHX identified",
+    "audiencePsychProfile": "The 2AM pain point, top tribal belief, and primary fear driving this audience — with specifics",
+    "algorithmPriorityStack": "For ${platform}: which 3 signals have highest weight right now and how this plan engineers each one",
+    "viralCoefficient": "Primary share trigger + secondary save trigger + comment ignition mechanism specific to ${topic}",
+    "compoundingArchitecture": "How Day 1-7 content builds the audience that makes Day 22-30 content 5-10× more effective"
+  },
   "channelPositioning": {
-    "description": "2-sentence channel description: WHO this channel is for + WHAT unique transformation/value it delivers. Laser-focused, memorable, differentiating.",
+    "description": "2-sentence channel description: WHO this is for + WHAT irreplaceable transformation it delivers. Must be impossible to confuse with any other channel.",
     "targetAudience": {
-      "demographics": "Specific age range, gender split estimate, income level, location concentration",
-      "psychographics": "Top 3 deep desires, top 2 deepest fears, tribal identity they want to belong to",
-      "contentHabits": "Where they currently consume content, what they're frustrated with in existing content"
+      "demographics": "Specific: age range, gender distribution estimate, household income bracket, primary US metro concentration",
+      "psychographics": "Top 3 desires (ranked), top 2 fears (with specifics), tribal identity statement they'd put on a t-shirt",
+      "contentHabits": "Current consumption sources + specific frustrations with those sources + the gap this channel fills"
     },
-    "uniquePoint": "The ONE thing this channel does that no existing top-10 creator in this niche does. Must be copyable by audience but NOT by competitors.",
-    "contentMoat": "The compounding advantage that makes this channel harder to replicate after 6 months of execution"
+    "uniquePoint": "The ONE angle no top-10 creator in ${topic} owns. Specific, ownable, compoundable.",
+    "contentMoat": "The unfair advantage that builds over 6 months of execution — impossible to replicate without the same time investment"
   },
   "contentPillars": [
     {
       "name": "Viral / Controversy Engine",
       "percentage": 35,
-      "description": "Content designed to spark debate, challenge common beliefs, or reveal uncomfortable truths. Drives shares and comments.",
-      "exampleFormat": "Specific content format example for this pillar in the ${topic} niche"
+      "description": "Challenges mainstream beliefs in ${topic}. Designed to trigger debate comments and identity-based shares.",
+      "exampleFormat": "Specific ready-to-execute format example for ${topic} on ${platform}",
+      "algorithmSignal": "Primary algorithm signal this pillar engineers"
     },
     {
-      "name": "Deep Value / Authority",
+      "name": "Deep Value / Authority Builder",
       "percentage": 35,
-      "description": "High-density value content that establishes expertise. Drives saves, subscribes, and trust.",
-      "exampleFormat": "Specific content format example for this pillar in the ${topic} niche"
+      "description": "High-density actionable insights that establish irreplaceable expertise. Drives saves and trust accumulation.",
+      "exampleFormat": "Specific ready-to-execute format example for ${topic} on ${platform}",
+      "algorithmSignal": "Primary algorithm signal this pillar engineers"
     },
     {
-      "name": "Storytelling / Human Connection",
+      "name": "Parasocial / Human Connection",
       "percentage": 30,
-      "description": "Personal stories, behind-the-scenes, emotional journeys. Drives parasocial bonding and long-term retention.",
-      "exampleFormat": "Specific content format example for this pillar in the ${topic} niche"
+      "description": "Vulnerability, behind-scenes, personal journey. Converts casual viewers into loyal subscribers.",
+      "exampleFormat": "Specific ready-to-execute format example for ${topic} on ${platform}",
+      "algorithmSignal": "Primary algorithm signal this pillar engineers"
     }
   ],
   "thirtyDayPlan": [
     {
       "day": 1,
       "pillar": "Viral / Controversy Engine",
-      "idea": "Specific, ready-to-film video idea with the exact angle and POV — no brainstorming needed",
-      "hook": "Exact opening line that STOPS the scroll — shocking stat, bold claim, or counterintuitive truth. Must be quotable.",
-      "format": "Short-Form (60s) | Long-Form (10min) | Story | Live | Carousel",
-      "duration": "Specific duration in minutes:seconds",
-      "cta": "One specific micro-commitment action (not 'like and subscribe')",
+      "idea": "Specific, ready-to-film idea with exact angle and POV — no additional brainstorming needed to start filming",
+      "hook": "Exact opening line: shocking stat OR bold counterintuitive claim OR 'the thing no one tells you about ${topic}'. Must be quotable as a standalone sentence.",
+      "format": "Short-Form Vertical (60s) | Long-Form (10-15min) | Story/Vlog | Live | Carousel",
+      "duration": "X:XX specific",
+      "cta": "Specific micro-commitment — not 'like and subscribe'. Example: 'Comment your biggest ${topic} mistake below'",
       "viralProbability": 8,
-      "viralReasoning": "Why this specific content has high viral potential in the ${topic} niche"
+      "viralReasoning": "Specific mechanism: which audience psychology trigger + which algorithm signal = why this has above-average viral potential"
     }
   ],
   "seoStrategy": {
     "keywords": [
       {
-        "keyword": "specific keyword phrase",
-        "searchVolume": "estimated monthly searches (e.g., 50K-100K)",
+        "keyword": "specific multi-word keyword phrase targeting ${topic}",
+        "searchVolume": "XX,000-XX,000 monthly US searches (estimated)",
         "competition": "Low | Medium | High",
-        "contentAngle": "How to use this keyword as the core of a specific video idea"
+        "difficulty": "1-100 estimated KD score",
+        "contentAngle": "Specific video concept that captures this keyword while being shareable"
       }
     ],
     "hashtags": {
-      "trending": ["5 currently trending hashtags in this niche"],
-      "niche": ["3 specific niche hashtags with moderate competition"],
-      "branded": ["2 branded hashtag concepts to own"]
+      "trending": ["5 currently high-momentum hashtags in ${topic} niche"],
+      "niche": ["3 specific mid-tier hashtags (50K-500K posts) for targeted reach"],
+      "branded": ["2 original branded hashtag concepts for community building"]
     },
     "titleTemplates": [
-      "5 proven title formulas customized for ${topic} — fill-in-the-blank ready"
+      "5 fill-in-the-blank title formulas proven for ${topic} — with the psychological trigger each one uses"
     ]
   },
   "viralFormula": {
     "hookTemplates": [
-      "5 specific hook templates for ${topic} on ${platform} — include the psychological trigger each one uses"
+      "5 hook templates specific to ${topic} on ${platform} — each labeled with its psychological trigger (curiosity gap / loss aversion / social proof / pattern interrupt / FOMO)"
     ],
     "contentTypes": [
       {
-        "format": "Specific content format name",
-        "viralMechanism": "Exactly why this format goes viral in ${topic} niche",
+        "format": "Specific named content format",
+        "viralMechanism": "Exact psychological + algorithmic reason this format outperforms in ${topic} niche",
         "productionComplexity": "Low | Medium | High",
-        "exampleTitle": "Ready-to-use example title"
+        "expectedMetric": "Realistic performance benchmark (e.g., '3-8% save rate', '40+ comments per 1K views')",
+        "exampleTitle": "Ready-to-use title for this format applied to ${topic}"
       }
     ],
     "engagementTriggers": [
-      "3 specific comment-bait questions or controversy angles proven to work in ${topic} niche"
+      "3 comment-ignition prompts or divisive statements specific to ${topic} community — each with expected comment volume reasoning"
     ]
   },
   "growthMilestones": {
-    "week1Goal": "Specific metric target for Week 1 (views, followers, or engagement rate)",
-    "week2Goal": "Specific metric target for Week 2",
-    "week4Goal": "Specific metric target for end of Day 30",
-    "keyLevers": "The 2-3 most critical actions that determine whether this 30-day plan succeeds or fails"
+    "week1Goal": "Specific metric: e.g., '500-1,000 views per video, 2-3% CTR baseline, identify top-performing content type'",
+    "week2Goal": "Specific metric: e.g., 'First video at 5K+ views, 50+ comments on one post, 100 new followers'",
+    "week4Goal": "Specific metric: e.g., '1 video at 20K+ views, 500 total new followers, 1 piece of content with save rate >5%'",
+    "keyLevers": "The 2-3 highest-leverage actions in this 30-day plan — if only these get done perfectly, the plan still succeeds"
   }
 }
 
-CRITICAL: Provide ALL 30 days in thirtyDayPlan. Each day must have a UNIQUE idea — zero repetition. Strategic mix: Days 1-7 build foundation, Days 8-21 find the viral hit, Days 22-30 compound and convert. Include the viralProbability score (1-10) for every day.`;
+EXECUTION RULES:
+1. Provide ALL 30 days — no shortcuts, no "continue this pattern for days X-Y"
+2. Every day: UNIQUE idea, UNIQUE hook, SPECIFIC viral reasoning
+3. Strategic arc: Days 1-7 (foundation + format testing) → Days 8-14 (amplify what worked) → Days 15-21 (viral attempts) → Days 22-30 (compound + convert)
+4. Mix pillars strategically — never 3 consecutive days of same pillar
+5. viralProbability must vary realistically (not all 8s) — Day 1 might be 5, a breakthrough day might be 9`;
 
 // ── Main generate — GROWTHX routes to Gemini for deep long-form reasoning ─────
 
