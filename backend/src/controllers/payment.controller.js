@@ -12,7 +12,7 @@ const bankInfo = () => ({
   bankId:        process.env.BANK_ID            || 'VCB',
   accountNumber: process.env.BANK_ACCOUNT_NUMBER || '1234567890',
   accountName:   process.env.BANK_ACCOUNT_NAME   || 'NGUYEN VAN A',
-  amount:        parseInt(process.env.PRO_PRICE_VND) || 299000,
+  amount:        parseInt(process.env.PRO_PRICE_VND) || 199000,
 });
 
 const makeTransferCode = (userId) =>

@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Zap, Check, Crown, Sparkles, Loader2 } from 'lucide-react';
-import { paymentAPI } from '@/lib/api';
+import { Zap, Check, Crown, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import UpgradeModal from '@/components/UpgradeModal';
 
 const FREE_FEATURES = [
   '3 lượt tạo nội dung / ngày',
@@ -25,23 +25,13 @@ const PRO_FEATURES = [
 ];
 
 export default function PricingPage() {
-  const { user }         = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  const handleUpgrade = async () => {
-    if (!user) { window.location.href = '/register'; return; }
-    setLoading(true);
-    try {
-      const { data } = await paymentAPI.createCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra.');
-      setLoading(false);
-    }
-  };
+  const { user } = useAuth();
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950">
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
 
       {/* Nav */}
       <nav className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
@@ -88,7 +78,7 @@ export default function PricingPage() {
             </div>
 
             <div className="flex items-end gap-1 mb-6">
-              <span className="text-5xl font-bold">$0</span>
+              <span className="text-5xl font-bold">0đ</span>
               <span className="text-slate-400 mb-2">/tháng</span>
             </div>
 
@@ -124,7 +114,7 @@ export default function PricingPage() {
             </div>
 
             <div className="flex items-end gap-1 mb-6">
-              <span className="text-5xl font-bold">$19</span>
+              <span className="text-5xl font-bold">199.000đ</span>
               <span className="text-slate-400 mb-2">/tháng</span>
             </div>
 
@@ -142,14 +132,10 @@ export default function PricingPage() {
               </div>
             ) : (
               <button
-                onClick={handleUpgrade}
-                disabled={loading}
+                onClick={() => user ? setShowUpgrade(true) : window.location.href = '/register'}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
-                {loading
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xử lý...</>
-                  : <><Crown className="w-4 h-4" /> Nâng cấp Pro ngay</>
-                }
+                <Crown className="w-4 h-4" /> Nâng cấp Pro ngay
               </button>
             )}
           </div>
@@ -161,12 +147,12 @@ export default function PricingPage() {
           <div className="space-y-6">
             {[
               {
-                q: 'Tôi có thể huỷ bất cứ lúc nào không?',
-                a: 'Có. Bạn có thể huỷ subscription bất kỳ lúc nào từ trang quản lý tài khoản. Sau khi huỷ, bạn vẫn dùng được đến hết kỳ thanh toán hiện tại.',
+                q: 'Thanh toán như thế nào?',
+                a: 'Chuyển khoản ngân hàng Vietcombank. Sau khi chuyển, bấm xác nhận và admin sẽ duyệt trong vòng 24 giờ. Tài khoản tự động lên Pro ngay khi được duyệt.',
               },
               {
-                q: 'Thanh toán có an toàn không?',
-                a: 'Hoàn toàn an toàn. Thanh toán được xử lý bởi Stripe — đối tác thanh toán được hàng triệu doanh nghiệp tin dùng. Chúng tôi không lưu thông tin thẻ.',
+                q: 'Gói Pro có hiệu lực bao lâu?',
+                a: 'Gói Pro có hiệu lực 30 ngày kể từ ngày được duyệt. Bạn có thể gia hạn bất cứ lúc nào.',
               },
               {
                 q: 'Nội dung AI tạo ra có bản quyền không?',
