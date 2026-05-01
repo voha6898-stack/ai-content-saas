@@ -48,9 +48,12 @@ const SCENE_TYPE_STYLE = {
   problem:    'border-l-red-500     bg-red-500/5',
   tease:      'border-l-yellow-500  bg-yellow-500/5',
   content:    'border-l-sky-500     bg-sky-500/5',
+  information:'border-l-sky-500     bg-sky-500/5',
   transition: 'border-l-slate-500   bg-slate-500/5',
   cta:        'border-l-green-500   bg-green-500/5',
   outro:      'border-l-purple-500  bg-purple-500/5',
+  story:      'border-l-pink-500    bg-pink-500/5',
+  twist:      'border-l-yellow-500  bg-yellow-500/5',
 };
 
 const SCENE_TYPE_BADGE = {
@@ -58,9 +61,12 @@ const SCENE_TYPE_BADGE = {
   problem:    'bg-red-500/20    text-red-400',
   tease:      'bg-yellow-500/20 text-yellow-400',
   content:    'bg-sky-500/20    text-sky-400',
+  information:'bg-sky-500/20    text-sky-400',
   transition: 'bg-slate-500/20  text-slate-400',
   cta:        'bg-green-500/20  text-green-400',
   outro:      'bg-purple-500/20 text-purple-400',
+  story:      'bg-pink-500/20   text-pink-400',
+  twist:      'bg-yellow-500/20 text-yellow-400',
 };
 
 // ── Copy hook ─────────────────────────────────────────────────────────────────
@@ -80,8 +86,9 @@ function useCopy(timeout = 1500) {
 
 function SceneCard({ scene, index, copy, copied }) {
   const [open, setOpen] = useState(index < 3);
-  const borderStyle = SCENE_TYPE_STYLE[scene.type] || SCENE_TYPE_STYLE.content;
-  const badgeStyle  = SCENE_TYPE_BADGE[scene.type]  || SCENE_TYPE_BADGE.content;
+  const typeKey     = scene.type?.split(/[\s&_-]/)[0]?.toLowerCase() || 'content';
+  const borderStyle = SCENE_TYPE_STYLE[typeKey] || SCENE_TYPE_STYLE.content;
+  const badgeStyle  = SCENE_TYPE_BADGE[typeKey] || SCENE_TYPE_BADGE.content;
   const sceneId     = `scene-${scene.id}`;
 
   return (

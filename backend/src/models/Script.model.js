@@ -5,7 +5,7 @@ const sceneSchema = new mongoose.Schema({
   name:      { type: String, required: true },
   timestamp: { type: String, required: true },
   duration:  { type: String, required: true },
-  type:      { type: String, enum: ['hook', 'problem', 'tease', 'content', 'transition', 'cta', 'outro'], default: 'content' },
+  type:      { type: String, default: 'content' },
   script:    { type: String, required: true },
   direction: { type: String, default: '' },
   overlay:   { type: String, default: '' },
