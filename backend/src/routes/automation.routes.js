@@ -3,24 +3,21 @@ const {
   createRule, getRules, updateRule, deleteRule, triggerRun, getRuns,
   getTrends, fetchTrendsNow,
 } = require('../controllers/automation.controller');
-const { protect }    = require('../middlewares/auth.middleware');
-const { requirePro } = require('../middlewares/auth.middleware');
+const { protect, requirePro } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
-router.use(protect, requirePro); // Automation chỉ dành cho Pro
+router.use(protect);
 
-// ── Automation Rules ──────────────────────────────────────────────────────────
-router.post  ('/rules',         createRule);
-router.get   ('/rules',         getRules);
-router.patch ('/rules/:id',     updateRule);
-router.delete('/rules/:id',     deleteRule);
-router.post  ('/rules/:id/run', triggerRun); // Chạy thủ công ngay
+// Trends — tất cả user đã đăng nhập đều xem được
+router.get ('/trends',       getTrends);
+router.post('/trends/fetch', fetchTrendsNow);
 
-// ── Runs history ──────────────────────────────────────────────────────────────
-router.get('/runs', getRuns);
-
-// ── Trends ───────────────────────────────────────────────────────────────────
-router.get ('/trends',       getTrends);       // GET trending items từ DB
-router.post('/trends/fetch', fetchTrendsNow);  // Trigger fetch thủ công
+// Automation Rules + Runs — chỉ Pro (admin bypass tự động trong requirePro)
+router.get   ('/rules',         requirePro, getRules);
+router.post  ('/rules',         requirePro, createRule);
+router.patch ('/rules/:id',     requirePro, updateRule);
+router.delete('/rules/:id',     requirePro, deleteRule);
+router.post  ('/rules/:id/run', requirePro, triggerRun);
+router.get   ('/runs',          requirePro, getRuns);
 
 module.exports = router;

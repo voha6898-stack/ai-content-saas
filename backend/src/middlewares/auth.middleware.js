@@ -14,7 +14,7 @@ const protect = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select('plan email');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -22,7 +22,12 @@ const protect = async (req, res, next) => {
       });
     }
 
-    req.user = { id: user._id.toString(), plan: user.plan };
+    req.user = {
+      id: user._id.toString(),
+      plan: user.plan,
+      email: user.email,
+      isAdmin: user.email === (process.env.ADMIN_EMAIL || ''),
+    };
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError') {
@@ -35,15 +40,14 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Chỉ cho phép plan Pro
+// Chỉ cho phép Pro — admin luôn được bypass
 const requirePro = (req, res, next) => {
-  if (req.user.plan !== 'pro') {
-    return res.status(403).json({
-      success: false,
-      message: 'Tính năng này chỉ dành cho người dùng Pro.',
-    });
-  }
-  next();
+  if (req.user.plan === 'pro' || req.user.isAdmin) return next();
+  return res.status(403).json({
+    success: false,
+    code: 'PRO_REQUIRED',
+    message: 'Tính năng này chỉ dành cho người dùng Pro.',
+  });
 };
 
 module.exports = { protect, requirePro };

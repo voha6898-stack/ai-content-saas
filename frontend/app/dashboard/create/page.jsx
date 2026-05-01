@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { contentAPI } from '@/lib/api';
@@ -23,9 +22,6 @@ export default function CreatePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <Link href="/dashboard" className="flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6">
-        <ArrowLeft className="w-4 h-4" /> Dashboard
-      </Link>
       <h1 className="text-2xl font-bold mb-6">Tạo nội dung mới</h1>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

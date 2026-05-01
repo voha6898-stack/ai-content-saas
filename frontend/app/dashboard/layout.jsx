@@ -30,6 +30,12 @@ export default function DashboardLayout({ children }) {
     if (!loading && !user) router.replace('/login');
   }, [user, loading, router]);
 
+  // Sync plan từ server mỗi khi vào dashboard (bắt kịp sau khi được duyệt Pro)
+  const { refreshUser } = useAuth();
+  useEffect(() => {
+    if (user) refreshUser();
+  }, []);
+
   const handleUpgrade = () => setShowUpgradeModal(true);
 
   if (loading || !user) {

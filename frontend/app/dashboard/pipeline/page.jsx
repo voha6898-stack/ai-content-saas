@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, GitBranch, Plus, Trash2, Loader2,
+  GitBranch, Plus, Trash2, Loader2,
   CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { pipelineAPI } from '@/lib/api';
@@ -108,9 +108,6 @@ export default function PipelinePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <Link href="/dashboard" className="flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6">
-        <ArrowLeft className="w-4 h-4" /> Dashboard
-      </Link>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Content Pipeline</h1>

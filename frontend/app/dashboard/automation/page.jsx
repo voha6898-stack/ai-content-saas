@@ -221,9 +221,12 @@ export default function AutomationPage() {
         automationAPI.getRules(),
         automationAPI.getRuns(),
       ]);
-      setRules(r.data.rules   || []);
-      setRuns(ru.data.runs    || []);
-    } catch {} finally { setLoading(false); }
+      setRules(r.data.rules || []);
+      setRuns(ru.data.runs  || []);
+    } catch (err) {
+      // 403 = free user, không làm gì — banner đã hiện
+      if (err.response?.status !== 403) console.error(err);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchAll(); }, []);
@@ -285,17 +288,16 @@ export default function AutomationPage() {
         </div>
       </div>
 
-      {/* Soft Pro upsell for free users */}
+      {/* Pro gate for free users */}
       {user?.plan === 'free' && (
-        <div className="bg-gradient-to-r from-violet-500/10 to-sky-500/10 border border-violet-500/20 rounded-2xl p-4 flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Crown className="w-5 h-5 text-yellow-400 shrink-0" />
-            <p className="text-sm text-slate-300">
-              <span className="font-semibold text-white">Nâng cấp Pro</span> để chạy automation không giới hạn, auto-post và monetize tự động.
-            </p>
-          </div>
-          <Link href="/pricing" className="btn-primary text-xs px-3 py-2 shrink-0 flex items-center gap-1.5">
-            <Crown className="w-3.5 h-3.5" /> Xem Pro
+        <div className="bg-gradient-to-br from-violet-500/10 via-sky-500/5 to-violet-500/10 border border-violet-500/30 rounded-2xl p-8 text-center mb-6">
+          <Crown className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Automation chỉ dành cho Pro</h2>
+          <p className="text-slate-400 text-sm mb-6 max-w-sm mx-auto">
+            Nâng cấp để tự động lấy trend, tạo content và đăng bài 24/7 không cần làm thủ công.
+          </p>
+          <Link href="/pricing" className="btn-primary inline-flex items-center gap-2">
+            <Crown className="w-4 h-4" /> Nâng cấp Pro — 199.000đ/tháng
           </Link>
         </div>
       )}
