@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap, LogOut, Crown, User, TrendingUp, FileText,
-  Send, GitBranch, DollarSign, Bot, Flame, Clapperboard, Rocket,
+  Send, GitBranch, DollarSign, Bot, Flame, Clapperboard, Rocket, BarChart2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import UpgradeModal from '@/components/UpgradeModal';
@@ -14,7 +14,8 @@ const NAV_ITEMS = [
   { href: '/dashboard',              label: 'Overview',     icon: TrendingUp  },
   { href: '/dashboard/create',       label: 'Tạo nội dung', icon: FileText    },
   { href: '/dashboard/script',       label: 'Script',       icon: Clapperboard },
-  { href: '/dashboard/growth',       label: 'Growth Plan',  icon: Rocket       },
+  { href: '/dashboard/growth',            label: 'Growth Plan',   icon: Rocket    },
+  { href: '/dashboard/channel-analysis', label: 'Channel Audit', icon: BarChart2 },
   { href: '/dashboard/trends',       label: 'Trends',       icon: Flame       },
   { href: '/dashboard/automation',   label: 'Automation',   icon: Bot         },
   { href: '/dashboard/distribution', label: 'Phân phối',    icon: Send        },

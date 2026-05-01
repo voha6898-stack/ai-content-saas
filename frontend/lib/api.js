@@ -111,6 +111,14 @@ export const adminPaymentAPI = {
   reject:       (id, note) => api.patch(`/admin/payment-requests/${id}/reject`, { note }),
 };
 
+export const channelAnalysisAPI = {
+  analyze:    (data) => api.post('/channel-analysis', data),
+  rewrite:    (id)   => api.post(`/channel-analysis/${id}/rewrite`),
+  getHistory: (page = 1, limit = 6) => api.get('/channel-analysis', { params: { page, limit } }),
+  getOne:     (id)   => api.get(`/channel-analysis/${id}`),
+  delete:     (id)   => api.delete(`/channel-analysis/${id}`),
+};
+
 export const adminAPI = {
   setupSelf:    ()                  => api.post('/admin/setup-self'),
   getStats:     ()                  => api.get('/admin/stats'),

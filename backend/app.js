@@ -14,7 +14,8 @@ const pipelineRoutes     = require('./src/routes/pipeline.routes');
 const monetizationRoutes = require('./src/routes/monetization.routes');
 const analyticsRoutes    = require('./src/routes/analytics.routes');
 const automationRoutes   = require('./src/routes/automation.routes');
-const adminRoutes        = require('./src/routes/admin.routes');
+const adminRoutes           = require('./src/routes/admin.routes');
+const channelAnalysisRoutes = require('./src/routes/channel-analysis.routes');
 const errorMiddleware    = require('./src/middlewares/error.middleware');
 
 const app = express();
@@ -83,7 +84,8 @@ app.use('/api/pipeline',     pipelineRoutes);
 app.use('/api/monetization', monetizationRoutes);
 app.use('/api/analytics',    analyticsRoutes);
 app.use('/api/automation',   automationRoutes);
-app.use('/api/admin',        adminRoutes);
+app.use('/api/admin',            adminRoutes);
+app.use('/api/channel-analysis', channelAnalysisRoutes);
 
 // ── Health check ──────────────────────────────────────
 app.get('/api/health', (req, res) => {
