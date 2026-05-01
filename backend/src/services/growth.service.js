@@ -1,4 +1,4 @@
-const { aiClient, aiModel } = require('./ai.service');
+const { callGemini } = require('./ai.service');
 const GrowthPlan = require('../models/GrowthPlan.model');
 const User       = require('../models/User.model');
 
@@ -174,40 +174,7 @@ Return ONLY valid JSON — no extra text, no markdown:
 
 CRITICAL: Provide ALL 30 days in thirtyDayPlan. Each day must have a UNIQUE idea — zero repetition. Strategic mix: Days 1-7 build foundation, Days 8-21 find the viral hit, Days 22-30 compound and convert. Include the viralProbability score (1-10) for every day.`;
 
-// ── AI call with retry ────────────────────────────────────────────────────────
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const callAI = async (prompt, attempt = 1) => {
-  try {
-    return await aiClient.chat.completions.create({
-      model:           aiModel,
-      messages: [
-        { role: 'system', content: GROWTHX_SYSTEM },
-        { role: 'user',   content: prompt },
-      ],
-      temperature:     0.82,
-      max_tokens:      5500,
-      response_format: { type: 'json_object' },
-    });
-  } catch (err) {
-    const status = err.status || err.response?.status;
-    if (status === 429 && attempt <= 3) {
-      const wait = Math.pow(2, attempt) * 5000;
-      console.warn(`⚠️  GROWTHX 429 — retry ${attempt}/3 in ${wait / 1000}s`);
-      await sleep(wait);
-      return callAI(prompt, attempt + 1);
-    }
-    if (status === 429) {
-      const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
-      e.statusCode = 503;
-      throw e;
-    }
-    throw err;
-  }
-};
-
-// ── Main generate ─────────────────────────────────────────────────────────────
+// ── Main generate — GROWTHX routes to Gemini for deep long-form reasoning ─────
 
 const generateGrowthPlan = async (userId, topic, platform, goal) => {
   const user = await User.findById(userId);
@@ -218,8 +185,8 @@ const generateGrowthPlan = async (userId, topic, platform, goal) => {
   }
 
   const prompt = buildPrompt(topic, platform, goal);
-  const resp   = await callAI(prompt);
-  const raw    = resp.choices[0].message.content;
+  // Gemini: better reasoning and larger context for 30-day complex plan
+  const raw = await callGemini(GROWTHX_SYSTEM, prompt, 5500, 0.82);
 
   let parsed;
   try { parsed = JSON.parse(raw); } catch {

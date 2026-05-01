@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// ── Provider ───────────────────────────────────────────────────────────────────
+// ── Groq/OpenAI Provider ───────────────────────────────────────────────────────
 const PROVIDER = process.env.AI_PROVIDER || 'openai';
 const PROVIDERS = {
   groq:   { apiKey: process.env.GROQ_API_KEY,   baseURL: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
@@ -9,6 +10,62 @@ const PROVIDERS = {
 const cfg    = PROVIDERS[PROVIDER] || PROVIDERS.openai;
 const client = new OpenAI({ apiKey: cfg.apiKey, ...(cfg.baseURL && { baseURL: cfg.baseURL }) });
 console.log(`🤖 AI Agent VIRA: ${PROVIDER.toUpperCase()} (${cfg.model})`);
+
+// ── Gemini Provider ────────────────────────────────────────────────────────────
+const GEMINI_MODEL  = 'gemini-2.0-flash';
+const geminiClient  = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
+if (geminiClient) console.log(`🤖 AI Agent GEMINI: ${GEMINI_MODEL} (active)`);
+else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini features will fallback to Groq`);
+
+const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// callGemini — used by growth.service and script.service for long-form content
+const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperature = 0.85, attempt = 1) => {
+  // Fallback to Groq-compatible format if Gemini key not configured
+  if (!geminiClient) {
+    const resp = await client.chat.completions.create({
+      model:           cfg.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userPrompt },
+      ],
+      temperature,
+      max_tokens:      maxTokens,
+      response_format: { type: 'json_object' },
+    });
+    return resp.choices[0].message.content;
+  }
+
+  try {
+    const model = geminiClient.getGenerativeModel({
+      model:            GEMINI_MODEL,
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        temperature,
+        maxOutputTokens:  maxTokens,
+        responseMimeType: 'application/json',
+      },
+    });
+    const result = await model.generateContent(userPrompt);
+    return result.response.text();
+  } catch (err) {
+    const status = err.status || err?.response?.status;
+    if (status === 429 && attempt <= 3) {
+      const wait = Math.pow(2, attempt) * 5000;
+      console.warn(`⚠️  Gemini 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
+      await _sleep(wait);
+      return callGemini(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
+    }
+    if (status === 429) {
+      const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
+      e.statusCode = 503;
+      throw e;
+    }
+    throw err;
+  }
+};
 
 // ── VIRA SYSTEM IDENTITY ───────────────────────────────────────────────────────
 // Viral Intelligence & Resonance Agent
@@ -291,4 +348,4 @@ const generateContent = async (topic, platform, _attempt = 1) => {
   }
 };
 
-module.exports = { generateContent, aiClient: client, aiModel: cfg.model };
+module.exports = { generateContent, aiClient: client, aiModel: cfg.model, callGemini };

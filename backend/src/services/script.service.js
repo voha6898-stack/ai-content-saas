@@ -1,4 +1,7 @@
-const { aiClient, aiModel } = require('./ai.service');
+const { aiClient, aiModel, callGemini } = require('./ai.service');
+
+// YouTube 10/15min scripts route to Gemini (long-form, needs larger context)
+const GEMINI_DURATIONS = new Set(['10 phút', '15 phút']);
 const Script = require('../models/Script.model');
 const User   = require('../models/User.model');
 
@@ -252,13 +255,13 @@ Trả về JSON hợp lệ:
   };
 };
 
-// ── AI call with retry ────────────────────────────────────────────────────────
+// ── AI call — routes to Gemini (long YT) or Groq (everything else) ───────────
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const callAI = async (prompt, maxTokens, attempt = 1) => {
+const callGroq = async (prompt, maxTokens, attempt = 1) => {
   try {
-    const resp = await aiClient.chat.completions.create({
+    return await aiClient.chat.completions.create({
       model:           aiModel,
       messages: [
         { role: 'system', content: SCRIPTA_SYSTEM },
@@ -268,14 +271,13 @@ const callAI = async (prompt, maxTokens, attempt = 1) => {
       max_tokens:      maxTokens,
       response_format: { type: 'json_object' },
     });
-    return resp;
   } catch (err) {
     const status = err.status || err.response?.status;
     if (status === 429 && attempt <= 3) {
       const wait = Math.pow(2, attempt) * 5000;
-      console.warn(`⚠️  SCRIPTA 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
+      console.warn(`⚠️  SCRIPTA Groq 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
       await sleep(wait);
-      return callAI(prompt, maxTokens, attempt + 1);
+      return callGroq(prompt, maxTokens, attempt + 1);
     }
     if (status === 429) {
       const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
@@ -284,6 +286,17 @@ const callAI = async (prompt, maxTokens, attempt = 1) => {
     }
     throw err;
   }
+};
+
+// Returns raw JSON string — provider-agnostic
+const callAI = async (prompt, maxTokens, platform, duration) => {
+  if (platform === 'YouTube' && GEMINI_DURATIONS.has(duration)) {
+    // Gemini for long-form YouTube (10-15min) — needs large context + deep reasoning
+    return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
+  }
+  // Groq for all short/medium scripts — faster generation
+  const resp = await callGroq(prompt, maxTokens);
+  return resp.choices[0].message.content;
 };
 
 // ── Main generator ────────────────────────────────────────────────────────────
@@ -305,8 +318,8 @@ const generateScript = async (userId, topic, platform, duration, style) => {
   }
 
   const { prompt, maxTokens } = builder(topic, duration, style);
-  const resp = await callAI(prompt, maxTokens);
-  const raw  = resp.choices[0].message.content;
+  // callAI routes: YouTube 10/15min → Gemini, everything else → Groq
+  const raw = await callAI(prompt, maxTokens, platform, duration);
 
   let parsed;
   try {
@@ -333,7 +346,7 @@ const generateScript = async (userId, topic, platform, duration, style) => {
     duration,
     style,
     output:     parsed,
-    tokensUsed: resp.usage?.total_tokens || 0,
+    tokensUsed: 0,
   });
 
   if (user.plan === 'free') {
