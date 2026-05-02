@@ -272,12 +272,13 @@ const callGroqAnalysis = async (prompt, attempt = 1) => {
     return resp.choices[0].message.content;
   } catch (err) {
     const status = err.status || err.response?.status;
-    if (status === 429 && attempt <= 2) {
+    const isTPD  = (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
+    // TPD: skip retries entirely, go straight to Gemini
+    if (status === 429 && !isTPD && attempt <= 2) {
       await sleep(attempt * 8000);
       return callGroqAnalysis(prompt, attempt + 1);
     }
-    // Groq exhausted — fall back to Gemini
-    console.warn(`⚠️  Groq analysis failed (${status || err.message}) — falling back to Gemini`);
+    console.warn(`⚠️  Groq analysis ${isTPD ? 'TPD' : 'exhausted'} — falling back to Gemini`);
     return callGemini(ANALYTICA_SYSTEM, prompt, 3500, 0.75);
   }
 };

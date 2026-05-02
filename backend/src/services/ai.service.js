@@ -21,20 +21,48 @@ else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
+const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
+
+// Direct Gemini call — last-resort, no recursion
+const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature) => {
+  if (!geminiClient) {
+    const e = new Error('Cả Groq lẫn Gemini đều không khả dụng. Thử lại sau ít phút.');
+    e.statusCode = 503;
+    throw e;
+  }
+  const model = geminiClient.getGenerativeModel({
+    model:            GEMINI_MODEL,
+    systemInstruction: systemPrompt,
+    generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+  });
+  const result = await model.generateContent(userPrompt);
+  return result.response.text();
+};
+
 // Groq fallback helper — used when Gemini is unavailable or rate-limited
 const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) => {
-  console.warn('⚠️  Routing to Groq fallback...');
-  const resp = await client.chat.completions.create({
-    model:           cfg.model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user',   content: userPrompt },
-    ],
-    temperature,
-    max_tokens:      Math.min(maxTokens, 8000),
-    response_format: { type: 'json_object' },
-  });
-  return resp.choices[0].message.content;
+  try {
+    console.warn('⚠️  Routing to Groq fallback...');
+    const resp = await client.chat.completions.create({
+      model:           cfg.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userPrompt },
+      ],
+      temperature,
+      max_tokens:      Math.min(maxTokens, 8000),
+      response_format: { type: 'json_object' },
+    });
+    return resp.choices[0].message.content;
+  } catch (err) {
+    const status = err.status || err?.response?.status;
+    if (status === 429) {
+      console.warn(`⚠️  Groq quota exceeded (${_isTPD(err) ? 'TPD' : 'RPM'}) — Gemini last resort`);
+      return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature);
+    }
+    throw err;
+  }
 };
 
 // callGemini — used by growth.service and script.service for long-form content
@@ -381,25 +409,20 @@ const generateContent = async (topic, platform, _attempt = 1) => {
   } catch (err) {
     const status = err.status || err.response?.status;
 
-    if (status === 429 && _attempt <= MAX) {
+    if (status === 429 && !_isTPD(err) && _attempt <= MAX) {
       const ms = Math.pow(2, _attempt) * 5000;
-      console.warn(`⚠️  VIRA 429 — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);
+      console.warn(`⚠️  VIRA RPM 429 — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);
       await sleep(ms);
       return generateContent(topic, platform, _attempt + 1);
     }
     if (status === 429) {
-      // Groq exhausted — try Gemini as emergency fallback
-      if (geminiClient) {
-        console.warn('⚠️  Groq exhausted — emergency fallback to Gemini for content');
-        const prompt = buildPrompt(topic, platform);
-        const raw = await callGemini(VIRA_SYSTEM, prompt, platform === 'YouTube' ? 3500 : 2800, 0.88);
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed.hashtags)) parsed.hashtags = [];
-        return { output: parsed, tokensUsed: 0 };
-      }
-      const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
-      e.statusCode = 503;
-      throw e;
+      // TPD exhausted or max retries — emergency Gemini fallback
+      console.warn(`⚠️  VIRA Groq ${_isTPD(err) ? 'TPD' : 'exhausted'} — Gemini emergency fallback`);
+      const prompt = buildPrompt(topic, platform);
+      const raw = await _geminiDirect(VIRA_SYSTEM, prompt, platform === 'YouTube' ? 3500 : 2800, 0.88);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.hashtags)) parsed.hashtags = [];
+      return { output: parsed, tokensUsed: 0 };
     }
     if (err instanceof SyntaxError && _attempt <= MAX) {
       await sleep(2000);

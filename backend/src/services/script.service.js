@@ -313,9 +313,11 @@ Trả về JSON hợp lệ:
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
+
 const callGroq = async (prompt, maxTokens, attempt = 1) => {
   try {
-    return await aiClient.chat.completions.create({
+    const resp = await aiClient.chat.completions.create({
       model:           aiModel,
       messages: [
         { role: 'system', content: SCRIPTA_SYSTEM },
@@ -325,18 +327,24 @@ const callGroq = async (prompt, maxTokens, attempt = 1) => {
       max_tokens:      maxTokens,
       response_format: { type: 'json_object' },
     });
+    return resp.choices[0].message.content;
   } catch (err) {
     const status = err.status || err.response?.status;
-    if (status === 429 && attempt <= 3) {
-      const wait = Math.pow(2, attempt) * 5000;
-      console.warn(`⚠️  SCRIPTA Groq 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
+    // TPD (daily quota) — skip retries, go straight to Gemini
+    if (status === 429 && _isTPD(err)) {
+      console.warn('⚠️  SCRIPTA Groq TPD exhausted — Gemini fallback');
+      return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
+    }
+    // RPM — retry with backoff then Gemini
+    if (status === 429 && attempt <= 2) {
+      const wait = attempt * 8000;
+      console.warn(`⚠️  SCRIPTA Groq RPM 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
       await sleep(wait);
       return callGroq(prompt, maxTokens, attempt + 1);
     }
     if (status === 429) {
-      const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
-      e.statusCode = 503;
-      throw e;
+      console.warn('⚠️  SCRIPTA Groq exhausted — Gemini fallback');
+      return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
     }
     throw err;
   }
@@ -348,9 +356,8 @@ const callAI = async (prompt, maxTokens, platform, duration) => {
     // Gemini for long-form YouTube (10-15min) — needs large context + deep reasoning
     return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
   }
-  // Groq for all short/medium scripts — faster generation
-  const resp = await callGroq(prompt, maxTokens);
-  return resp.choices[0].message.content;
+  // Groq for all short/medium scripts — faster generation (now returns raw string)
+  return callGroq(prompt, maxTokens);
 };
 
 // ── Main generator ────────────────────────────────────────────────────────────
