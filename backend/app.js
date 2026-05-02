@@ -93,6 +93,7 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: 'ContentAI Platform v2 running',
     timestamp: new Date(),
+    version: 'v2.1-dual-ai-fallback',
     modules: ['auth', 'content', 'distribution', 'pipeline', 'monetization', 'analytics'],
   });
 });
