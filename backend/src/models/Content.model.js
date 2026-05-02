@@ -19,12 +19,7 @@ const contentSchema = new mongoose.Schema(
       required: true,
       enum: ['YouTube', 'TikTok', 'Facebook', 'Instagram'],
     },
-    output: {
-      title: { type: String, required: true },
-      script: { type: String, required: true },
-      caption: { type: String, required: true },
-      hashtags: [{ type: String }],
-    },
+    output: { type: mongoose.Schema.Types.Mixed, default: {} },
     tokensUsed: {
       type: Number,
       default: 0,
