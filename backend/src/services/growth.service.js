@@ -264,7 +264,7 @@ const generateGrowthPlan = async (userId, topic, platform, goal) => {
     platform,
     goal,
     output:     parsed,
-    tokensUsed: resp.usage?.total_tokens || 0,
+    tokensUsed: 0,
   });
 
   if (user.plan === 'free') {

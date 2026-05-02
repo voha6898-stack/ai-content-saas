@@ -259,7 +259,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const callGroqAnalysis = async (prompt, attempt = 1) => {
   try {
-    return await aiClient.chat.completions.create({
+    const resp = await aiClient.chat.completions.create({
       model:           aiModel,
       messages: [
         { role: 'system', content: ANALYTICA_SYSTEM },
@@ -269,14 +269,16 @@ const callGroqAnalysis = async (prompt, attempt = 1) => {
       max_tokens:      3500,
       response_format: { type: 'json_object' },
     });
+    return resp.choices[0].message.content;
   } catch (err) {
     const status = err.status || err.response?.status;
-    if (status === 429 && attempt <= 3) {
-      await sleep(Math.pow(2, attempt) * 5000);
+    if (status === 429 && attempt <= 2) {
+      await sleep(attempt * 8000);
       return callGroqAnalysis(prompt, attempt + 1);
     }
-    if (status === 429) { const e = new Error('AI đang bận, thử lại sau.'); e.statusCode = 503; throw e; }
-    throw err;
+    // Groq exhausted — fall back to Gemini
+    console.warn(`⚠️  Groq analysis failed (${status || err.message}) — falling back to Gemini`);
+    return callGemini(ANALYTICA_SYSTEM, prompt, 3500, 0.75);
   }
 };
 
@@ -291,13 +293,10 @@ const analyzeChannel = async (userId, { platform, handle, niche, goal, mode, met
 
   const prompt = buildAnalysisPrompt({ platform, handle, niche, goal, mode, metrics: metrics || {}, sampleContent: sampleContent || '' });
 
-  let raw, tokensUsed = 0;
+  let raw;
   if (mode === 'quick') {
-    const resp = await callGroqAnalysis(prompt);
-    raw = resp.choices[0].message.content;
-    tokensUsed = resp.usage?.total_tokens || 0;
+    raw = await callGroqAnalysis(prompt);
   } else {
-    // Deep analysis — Gemini for maximum reasoning depth
     raw = await callGemini(ANALYTICA_SYSTEM, prompt, 4500, 0.75);
   }
 
@@ -318,7 +317,7 @@ const analyzeChannel = async (userId, { platform, handle, niche, goal, mode, met
   const doc = await ChannelAnalysis.create({
     userId, platform, handle: handle || '', niche, goal, mode,
     metrics: metrics || {}, sampleContent: sampleContent || '',
-    analysis, tokensUsed,
+    analysis, tokensUsed: 0,
   });
 
   if (user.plan === 'free') await User.findByIdAndUpdate(userId, { $inc: { credits: -1 } });
