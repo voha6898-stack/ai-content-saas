@@ -21,21 +21,27 @@ else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Groq fallback helper — used when Gemini is unavailable or rate-limited
+const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) => {
+  console.warn('⚠️  Routing to Groq fallback...');
+  const resp = await client.chat.completions.create({
+    model:           cfg.model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: userPrompt },
+    ],
+    temperature,
+    max_tokens:      Math.min(maxTokens, 8000),
+    response_format: { type: 'json_object' },
+  });
+  return resp.choices[0].message.content;
+};
+
 // callGemini — used by growth.service and script.service for long-form content
 const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperature = 0.85, attempt = 1) => {
-  // Fallback to Groq-compatible format if Gemini key not configured
+  // No Gemini key — route to Groq directly
   if (!geminiClient) {
-    const resp = await client.chat.completions.create({
-      model:           cfg.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userPrompt },
-      ],
-      temperature,
-      max_tokens:      maxTokens,
-      response_format: { type: 'json_object' },
-    });
-    return resp.choices[0].message.content;
+    return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
   }
 
   try {
@@ -52,18 +58,15 @@ const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperatur
     return result.response.text();
   } catch (err) {
     const status = err.status || err?.response?.status;
-    if (status === 429 && attempt <= 3) {
-      const wait = Math.pow(2, attempt) * 5000;
-      console.warn(`⚠️  Gemini 429 — retry ${attempt}/3 sau ${wait / 1000}s`);
+    if (status === 429 && attempt <= 2) {
+      const wait = attempt * 8000;
+      console.warn(`⚠️  Gemini 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
       await _sleep(wait);
       return callGemini(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
     }
-    if (status === 429) {
-      const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
-      e.statusCode = 503;
-      throw e;
-    }
-    throw err;
+    // Gemini exhausted or any other error → fall back to Groq silently
+    console.warn(`⚠️  Gemini failed (status: ${status || err.message}) — falling back to Groq`);
+    return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
   }
 };
 
@@ -385,6 +388,15 @@ const generateContent = async (topic, platform, _attempt = 1) => {
       return generateContent(topic, platform, _attempt + 1);
     }
     if (status === 429) {
+      // Groq exhausted — try Gemini as emergency fallback
+      if (geminiClient) {
+        console.warn('⚠️  Groq exhausted — emergency fallback to Gemini for content');
+        const prompt = buildPrompt(topic, platform);
+        const raw = await callGemini(VIRA_SYSTEM, prompt, platform === 'YouTube' ? 3500 : 2800, 0.88);
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed.hashtags)) parsed.hashtags = [];
+        return { output: parsed, tokensUsed: 0 };
+      }
       const e = new Error('AI đang bận, vui lòng thử lại sau 30 giây.');
       e.statusCode = 503;
       throw e;
