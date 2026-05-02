@@ -24,20 +24,32 @@ const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
 
-// Direct Gemini call — last-resort, no recursion
-const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature) => {
+// Direct Gemini call — last-resort, no recursion, with RPM retry
+const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, attempt = 1) => {
   if (!geminiClient) {
-    const e = new Error('Cả Groq lẫn Gemini đều không khả dụng. Thử lại sau ít phút.');
+    const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
     e.statusCode = 503;
     throw e;
   }
-  const model = geminiClient.getGenerativeModel({
-    model:            GEMINI_MODEL,
-    systemInstruction: systemPrompt,
-    generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
-  });
-  const result = await model.generateContent(userPrompt);
-  return result.response.text();
+  try {
+    const model = geminiClient.getGenerativeModel({
+      model:            GEMINI_MODEL,
+      systemInstruction: systemPrompt,
+      generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+    });
+    const result = await model.generateContent(userPrompt);
+    return result.response.text();
+  } catch (err) {
+    const status = err.status || err?.response?.status;
+    if (status === 429 && attempt <= 2) {
+      console.warn(`⚠️  Gemini last-resort 429 — retry ${attempt}/2 sau 20s`);
+      await _sleep(20000);
+      return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
+    }
+    const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
+    e.statusCode = 503;
+    throw e;
+  }
 };
 
 // Groq fallback helper — used when Gemini is unavailable or rate-limited
