@@ -5,10 +5,11 @@ import {
   Crown, Loader2, RefreshCw, Users, FileText, BarChart2,
   Download, CheckCircle, XCircle, Clock, AlertCircle,
   Search, Shield, Trash2, ChevronLeft, ChevronRight,
-  CreditCard, Star, UserX, Settings, BarChart3, Zap,
+  CreditCard, Star, UserX, Settings, BarChart3, Zap, LifeBuoy, Send,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import api, { adminPaymentAPI, adminAPI } from '@/lib/api';
+import api, { adminPaymentAPI, adminAPI, adminSupportAPI } from '@/lib/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -227,6 +228,237 @@ function UserRow({ u, adminEmail, onUpdate, onDelete }) {
   );
 }
 
+// ── Admin Support Tab ─────────────────────────────────────────────────────────
+
+const TICKET_STATUS_META = {
+  open:        { label: 'Mở',           color: 'bg-sky-500/10 border-sky-500/30 text-sky-400' },
+  in_progress: { label: 'Đang xử lý',   color: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
+  resolved:    { label: 'Đã xử lý',     color: 'bg-green-500/10 border-green-500/30 text-green-400' },
+  closed:      { label: 'Đã đóng',      color: 'bg-slate-700 border-slate-600 text-slate-400' },
+};
+
+const TICKET_PRIORITY_COLOR = {
+  low:    'text-slate-400',
+  normal: 'text-slate-300',
+  high:   'text-yellow-400',
+  urgent: 'text-red-400',
+};
+
+const PRIORITY_LABEL = { low: 'Thấp', normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn cấp' };
+
+function AdminSupportPanel() {
+  const [tickets,       setTickets]       = useState([]);
+  const [total,         setTotal]         = useState(0);
+  const [page,          setPage]          = useState(1);
+  const [statusFilter,  setStatusFilter]  = useState('');
+  const [loading,       setLoading]       = useState(true);
+  const [statusCounts,  setStatusCounts]  = useState({});
+  const [selectedId,    setSelectedId]    = useState(null);
+  const [detail,        setDetail]        = useState(null);
+  const [detailLoad,    setDetailLoad]    = useState(false);
+  const [replyMsg,      setReplyMsg]      = useState('');
+  const [replyStatus,   setReplyStatus]   = useState('in_progress');
+  const [sending,       setSending]       = useState(false);
+
+  const load = useCallback(async (p = 1, s = '') => {
+    setLoading(true);
+    try {
+      const { data } = await adminSupportAPI.getAll({ page: p, limit: 15, ...(s && { status: s }) });
+      setTickets(data.data.tickets);
+      setTotal(data.data.total);
+      setStatusCounts(data.data.statusCounts || {});
+    } catch {} finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(page, statusFilter); }, [page, statusFilter]);
+
+  const openDetail = async (id) => {
+    setSelectedId(id);
+    setDetailLoad(true);
+    try {
+      const { data } = await adminSupportAPI.getOne(id);
+      setDetail(data.data);
+      setReplyStatus(data.data.status === 'open' ? 'in_progress' : data.data.status);
+    } catch {} finally { setDetailLoad(false); }
+  };
+
+  const sendReply = async (e) => {
+    e.preventDefault();
+    if (!replyMsg.trim()) return;
+    setSending(true);
+    try {
+      await adminSupportAPI.reply(selectedId, { message: replyMsg.trim(), status: replyStatus });
+      setReplyMsg('');
+      const { data } = await adminSupportAPI.getOne(selectedId);
+      setDetail(data.data);
+      load(page, statusFilter);
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi'); }
+    finally { setSending(false); }
+  };
+
+  const updateStatus = async (id, status) => {
+    try {
+      await adminSupportAPI.updateStatus(id, { status });
+      if (selectedId === id) {
+        const { data } = await adminSupportAPI.getOne(id);
+        setDetail(data.data);
+      }
+      load(page, statusFilter);
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi'); }
+  };
+
+  const pages = Math.ceil(total / 15);
+
+  if (selectedId) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => { setSelectedId(null); setDetail(null); }}
+          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+          <ChevronLeft className="w-4 h-4" /> Quay lại danh sách
+        </button>
+
+        {detailLoad || !detail ? (
+          <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-slate-500" /></div>
+        ) : (
+          <div className="space-y-4 max-w-2xl">
+            <div className="card space-y-2">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="font-semibold">{detail.subject}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {detail.userId?.name} ({detail.userId?.email}) · {detail.userId?.plan}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${TICKET_STATUS_META[detail.status]?.color}`}>
+                  {TICKET_STATUS_META[detail.status]?.label}
+                </span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {['open', 'in_progress', 'resolved', 'closed'].map((s) => (
+                  <button key={s} onClick={() => updateStatus(detail._id, s)} disabled={detail.status === s}
+                    className={`text-xs px-2.5 py-1 rounded-xl border transition-colors disabled:opacity-40
+                      ${TICKET_STATUS_META[s]?.color}`}>
+                    {TICKET_STATUS_META[s]?.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {detail.replies.map((r, i) => (
+                <div key={i}
+                  className={`card ${r.senderRole === 'admin' ? 'border-sky-500/20 bg-sky-500/5' : 'border-slate-700'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-semibold ${r.senderRole === 'admin' ? 'text-sky-400' : 'text-slate-300'}`}>
+                      {r.senderRole === 'admin' ? '🛡️ Admin' : '👤 ' + r.senderName}
+                    </span>
+                    <span className="text-[11px] text-slate-600">{fmtDateTime(r.createdAt)}</span>
+                  </div>
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap">{r.message}</p>
+                </div>
+              ))}
+            </div>
+
+            {detail.status !== 'closed' && (
+              <form onSubmit={sendReply} className="card space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-slate-400 shrink-0">Phản hồi:</label>
+                  <select value={replyStatus} onChange={(e) => setReplyStatus(e.target.value)}
+                    className="input-field text-xs py-1.5 flex-1">
+                    {Object.entries(TICKET_STATUS_META).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <textarea value={replyMsg} onChange={(e) => setReplyMsg(e.target.value)}
+                  placeholder="Nhập nội dung phản hồi..." rows={4}
+                  className="input-field w-full resize-none" />
+                <button type="submit" disabled={sending || !replyMsg.trim()}
+                  className="btn-primary flex items-center gap-2">
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Gửi phản hồi
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Status filters */}
+      <div className="flex gap-2 flex-wrap">
+        {[['', `Tất cả (${total})`], ['open', `Mở (${statusCounts.open || 0})`],
+          ['in_progress', `Đang xử lý (${statusCounts.in_progress || 0})`],
+          ['resolved', `Đã xử lý (${statusCounts.resolved || 0})`],
+          ['closed', `Đã đóng (${statusCounts.closed || 0})`],
+        ].map(([s, label]) => (
+          <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all
+              ${statusFilter === s
+                ? 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-500" /></div>
+      ) : tickets.length === 0 ? (
+        <div className="card text-center py-14">
+          <MessageSquare className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+          <p className="text-slate-500 text-sm">Chưa có ticket nào.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tickets.map((t) => (
+            <button key={t._id} onClick={() => openDetail(t._id)}
+              className="card w-full text-left border-slate-700 hover:border-slate-600 transition-colors">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm truncate">{t.subject}</p>
+                    {t.hasUnreadReply && (
+                      <span className="text-[10px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full">Mới</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {t.userId?.name} · {t.userId?.email} ·{' '}
+                    <span className={TICKET_PRIORITY_COLOR[t.priority]}>{PRIORITY_LABEL[t.priority]}</span>
+                    {' · '}{fmtDateTime(t.createdAt)}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${TICKET_STATUS_META[t.status]?.color}`}>
+                  {TICKET_STATUS_META[t.status]?.label}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-500">Trang {page}/{pages} · {total} tickets</span>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)}
+              className="p-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white disabled:opacity-40 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button disabled={page === pages} onClick={() => setPage(page + 1)}
+              className="p-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white disabled:opacity-40 transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Admin Page ───────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -327,6 +559,7 @@ export default function AdminPage() {
     { id: 'stats',    label: 'Thống kê',      icon: BarChart3 },
     { id: 'users',    label: `Users (${userTotal})`, icon: Users },
     { id: 'payments', label: 'Thanh toán',    icon: CreditCard, badge: pendingCount },
+    { id: 'support',  label: 'Hỗ trợ',        icon: LifeBuoy },
     { id: 'export',   label: 'Xuất Excel',    icon: Download },
     { id: 'settings', label: 'Cài đặt Admin', icon: Settings },
   ];
@@ -515,6 +748,9 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+      {/* ── SUPPORT ── */}
+      {tab === 'support' && <AdminSupportPanel />}
 
       {/* ── EXPORT ── */}
       {tab === 'export' && (

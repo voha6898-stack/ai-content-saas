@@ -16,6 +16,7 @@ const analyticsRoutes    = require('./src/routes/analytics.routes');
 const automationRoutes   = require('./src/routes/automation.routes');
 const adminRoutes           = require('./src/routes/admin.routes');
 const channelAnalysisRoutes = require('./src/routes/channel-analysis.routes');
+const supportRoutes          = require('./src/routes/support.routes');
 const errorMiddleware    = require('./src/middlewares/error.middleware');
 
 const app = express();
@@ -89,6 +90,7 @@ app.use('/api/analytics',    analyticsRoutes);
 app.use('/api/automation',   automationRoutes);
 app.use('/api/admin',            adminRoutes);
 app.use('/api/channel-analysis', channelAnalysisRoutes);
+app.use('/api/support',          supportRoutes);
 
 // ── Health check ──────────────────────────────────────
 app.get('/api/health', (req, res) => {

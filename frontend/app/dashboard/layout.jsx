@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap, LogOut, Crown, User, TrendingUp, FileText,
-  Send, GitBranch, DollarSign, Bot, Flame, Clapperboard, Rocket, BarChart2,
+  Send, GitBranch, DollarSign, Bot, Flame, Clapperboard, Rocket, BarChart2, LifeBuoy,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import UpgradeModal from '@/components/UpgradeModal';
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/distribution', label: 'Phân phối',    icon: Send        },
   { href: '/dashboard/pipeline',     label: 'Pipeline',     icon: GitBranch   },
   { href: '/dashboard/monetization', label: 'Monetize',     icon: DollarSign  },
+  { href: '/dashboard/support',      label: 'Hỗ trợ',       icon: LifeBuoy    },
 ];
 
 export default function DashboardLayout({ children }) {

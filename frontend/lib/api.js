@@ -127,4 +127,18 @@ export const adminAPI = {
   deleteUser:   (id)                => api.delete(`/admin/users/${id}`),
 };
 
+export const supportAPI = {
+  create:   (data)          => api.post('/support', data),
+  getList:  (params = {})   => api.get('/support', { params }),
+  getOne:   (id)            => api.get(`/support/${id}`),
+  addReply: (id, message)   => api.post(`/support/${id}/reply`, { message }),
+};
+
+export const adminSupportAPI = {
+  getAll:       (params = {}) => api.get('/support/admin/all', { params }),
+  getOne:       (id)          => api.get(`/support/admin/${id}`),
+  reply:        (id, data)    => api.post(`/support/admin/${id}/reply`, data),
+  updateStatus: (id, data)    => api.patch(`/support/admin/${id}/status`, data),
+};
+
 export default api;
