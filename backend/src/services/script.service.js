@@ -329,20 +329,20 @@ const callGroq = async (prompt, maxTokens, attempt = 1) => {
     });
     return resp.choices[0].message.content;
   } catch (err) {
-    const status = err.status || err.response?.status;
+    const is429 = (err.status || err?.response?.status) === 429 || (err.message || '').includes('[429');
     // TPD (daily quota) — skip retries, go straight to Gemini
-    if (status === 429 && _isTPD(err)) {
+    if (is429 && _isTPD(err)) {
       console.warn('⚠️  SCRIPTA Groq TPD exhausted — Gemini fallback');
       return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
     }
     // RPM — retry with backoff then Gemini
-    if (status === 429 && attempt <= 2) {
+    if (is429 && attempt <= 2) {
       const wait = attempt * 8000;
       console.warn(`⚠️  SCRIPTA Groq RPM 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
       await sleep(wait);
       return callGroq(prompt, maxTokens, attempt + 1);
     }
-    if (status === 429) {
+    if (is429) {
       console.warn('⚠️  SCRIPTA Groq exhausted — Gemini fallback');
       return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
     }

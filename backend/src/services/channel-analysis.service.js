@@ -271,10 +271,10 @@ const callGroqAnalysis = async (prompt, attempt = 1) => {
     });
     return resp.choices[0].message.content;
   } catch (err) {
-    const status = err.status || err.response?.status;
-    const isTPD  = (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
-    // TPD: skip retries entirely, go straight to Gemini
-    if (status === 429 && !isTPD && attempt <= 2) {
+    const isTPD = (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
+    const is429 = (err.status || err?.response?.status) === 429 || (err.message || '').includes('[429');
+    // TPD: skip retries, go straight to Gemini
+    if (is429 && !isTPD && attempt <= 2) {
       await sleep(attempt * 8000);
       return callGroqAnalysis(prompt, attempt + 1);
     }

@@ -21,6 +21,12 @@ else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Detect 429 from either Groq (err.status) or Gemini SDK (embedded in err.message)
+const _is429 = (err) => {
+  const status = err.status || err?.response?.status;
+  const msg    = err.message || '';
+  return status === 429 || msg.includes('[429') || msg.includes('429 Too Many');
+};
 // Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
 
@@ -40,8 +46,7 @@ const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, a
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (err) {
-    const status = err.status || err?.response?.status;
-    if (status === 429 && attempt <= 2) {
+    if (_is429(err) && attempt <= 2) {
       console.warn(`⚠️  Gemini last-resort 429 — retry ${attempt}/2 sau 20s`);
       await _sleep(20000);
       return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
@@ -68,8 +73,7 @@ const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) =
     });
     return resp.choices[0].message.content;
   } catch (err) {
-    const status = err.status || err?.response?.status;
-    if (status === 429) {
+    if (_is429(err)) {
       console.warn(`⚠️  Groq quota exceeded (${_isTPD(err) ? 'TPD' : 'RPM'}) — Gemini last resort`);
       return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature);
     }
@@ -97,15 +101,14 @@ const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperatur
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (err) {
-    const status = err.status || err?.response?.status;
-    if (status === 429 && attempt <= 2) {
+    if (_is429(err) && attempt <= 2) {
       const wait = attempt * 8000;
       console.warn(`⚠️  Gemini 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
       await _sleep(wait);
       return callGemini(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
     }
     // Gemini exhausted or any other error → fall back to Groq silently
-    console.warn(`⚠️  Gemini failed (status: ${status || err.message}) — falling back to Groq`);
+    console.warn(`⚠️  Gemini failed — falling back to Groq: ${err.message?.substring(0, 100)}`);
     return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
   }
 };
@@ -419,15 +422,13 @@ const generateContent = async (topic, platform, _attempt = 1) => {
     return { output: parsed, tokensUsed: response.usage?.total_tokens || 0 };
 
   } catch (err) {
-    const status = err.status || err.response?.status;
-
-    if (status === 429 && !_isTPD(err) && _attempt <= MAX) {
+    if (_is429(err) && !_isTPD(err) && _attempt <= MAX) {
       const ms = Math.pow(2, _attempt) * 5000;
       console.warn(`⚠️  VIRA RPM 429 — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);
       await sleep(ms);
       return generateContent(topic, platform, _attempt + 1);
     }
-    if (status === 429) {
+    if (_is429(err)) {
       // TPD exhausted or max retries — emergency Gemini fallback
       console.warn(`⚠️  VIRA Groq ${_isTPD(err) ? 'TPD' : 'exhausted'} — Gemini emergency fallback`);
       const prompt = buildPrompt(topic, platform);
