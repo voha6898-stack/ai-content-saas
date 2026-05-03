@@ -9,7 +9,9 @@ const PROVIDERS = {
 };
 const cfg    = PROVIDERS[PROVIDER] || PROVIDERS.openai;
 const client = new OpenAI({ apiKey: cfg.apiKey, ...(cfg.baseURL && { baseURL: cfg.baseURL }) });
-console.log(`🤖 AI Agent VIRA: ${PROVIDER.toUpperCase()} (${cfg.model})`);
+// Groq fallback model when primary hits TPD (llama-3.1-8b-instant: 750K TPD vs 100K for 70b)
+const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
+console.log(`🤖 AI Agent VIRA: ${PROVIDER.toUpperCase()} (${cfg.model} → ${GROQ_FALLBACK_MODEL} on TPD)`);
 
 // ── Gemini Provider ────────────────────────────────────────────────────────────
 const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite']; // rotation on 429 (gemini-1.5-flash deprecated)
@@ -85,11 +87,13 @@ const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, m
 
 // Groq fallback helper
 // alreadyTriedGemini=true prevents re-entering Gemini when we know it's also 429
-const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature, alreadyTriedGemini = false) => {
+// useSmallModel=true means we're already on the fallback 8b model
+const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature, alreadyTriedGemini = false, useSmallModel = false) => {
+  const model = useSmallModel ? GROQ_FALLBACK_MODEL : cfg.model;
   try {
-    console.warn('⚠️  Routing to Groq fallback...');
+    if (!useSmallModel) console.warn('⚠️  Routing to Groq fallback...');
     const resp = await client.chat.completions.create({
-      model:           cfg.model,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: userPrompt },
@@ -102,10 +106,14 @@ const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature, a
   } catch (err) {
     if (_is429(err)) {
       const reason = _isTPD(err) ? 'TPD' : 'RPM';
-      console.warn(`⚠️  Groq quota exceeded (${reason})`);
-      // If we already tried Gemini (both 429) don't loop back — fail cleanly
+      // If primary Groq model hit TPD, try fallback 8b model first (750K TPD)
+      if (!useSmallModel && PROVIDER === 'groq') {
+        console.warn(`⚠️  Groq ${cfg.model} ${reason} — trying ${GROQ_FALLBACK_MODEL} (750K TPD)`);
+        return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature, alreadyTriedGemini, true);
+      }
+      console.warn(`⚠️  Groq ${reason} exhausted`);
       if (alreadyTriedGemini) throw _busyError();
-      console.warn('⚠️  Groq TPD/RPM — Gemini last resort');
+      console.warn('⚠️  All Groq models exhausted — Gemini last resort');
       return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature);
     }
     throw err;
@@ -428,14 +436,15 @@ FINAL REMINDER: Script phải nghe như người Việt thật đang nói chuy�
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const generateContent = async (topic, platform, _attempt = 1) => {
+const generateContent = async (topic, platform, _attempt = 1, _useSmallModel = false) => {
   const prompt    = buildPrompt(topic, platform);
   const maxTokens = platform === 'YouTube' ? 3500 : 2800;
   const MAX       = 3;
+  const model     = _useSmallModel ? GROQ_FALLBACK_MODEL : cfg.model;
 
   try {
     const response = await client.chat.completions.create({
-      model:           cfg.model,
+      model,
       messages: [
         { role: 'system', content: VIRA_SYSTEM },
         { role: 'user',   content: prompt },
@@ -458,25 +467,30 @@ const generateContent = async (topic, platform, _attempt = 1) => {
   } catch (err) {
     if (_is429(err) && !_isTPD(err) && _attempt <= MAX) {
       const ms = Math.pow(2, _attempt) * 5000;
-      console.warn(`⚠️  VIRA RPM 429 — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);
+      console.warn(`⚠️  VIRA RPM 429 (${model}) — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);
       await sleep(ms);
-      return generateContent(topic, platform, _attempt + 1);
+      return generateContent(topic, platform, _attempt + 1, _useSmallModel);
+    }
+    if (_is429(err) && _isTPD(err) && !_useSmallModel && PROVIDER === 'groq') {
+      // Primary Groq model TPD — try 8b model first (750K TPD)
+      console.warn(`⚠️  VIRA ${cfg.model} TPD — trying ${GROQ_FALLBACK_MODEL} (750K TPD)`);
+      return generateContent(topic, platform, 1, true);
     }
     if (_is429(err)) {
-      // TPD exhausted or max retries — emergency Gemini fallback
-      console.warn(`⚠️  VIRA Groq ${_isTPD(err) ? 'TPD' : 'exhausted'} — Gemini emergency fallback`);
-      const prompt = buildPrompt(topic, platform);
-      const raw = await _geminiDirect(VIRA_SYSTEM, prompt, platform === 'YouTube' ? 3500 : 2800, 0.88);
+      // All Groq models exhausted — Gemini emergency fallback
+      console.warn(`⚠️  VIRA Groq exhausted — Gemini emergency fallback`);
+      const p = buildPrompt(topic, platform);
+      const raw = await _geminiDirect(VIRA_SYSTEM, p, maxTokens, 0.88);
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed.hashtags)) parsed.hashtags = [];
       return { output: parsed, tokensUsed: 0 };
     }
     if (err instanceof SyntaxError && _attempt <= MAX) {
       await sleep(2000);
-      return generateContent(topic, platform, _attempt + 1);
+      return generateContent(topic, platform, _attempt + 1, _useSmallModel);
     }
     throw err;
   }
 };
 
-module.exports = { generateContent, aiClient: client, aiModel: cfg.model, callGemini };
+module.exports = { generateContent, aiClient: client, aiModel: cfg.model, aiModelFallback: GROQ_FALLBACK_MODEL, callGemini };

@@ -1,4 +1,4 @@
-const { aiClient, aiModel, callGemini } = require('./ai.service');
+const { aiClient, aiModel, aiModelFallback, callGemini } = require('./ai.service');
 const ChannelAnalysis = require('../models/ChannelAnalysis.model');
 const User            = require('../models/User.model');
 
@@ -257,10 +257,11 @@ RULES: Minimum 10 titleTemplates, 8 hookTemplates, 5 ctaScripts. All content pla
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const callGroqAnalysis = async (prompt, attempt = 1) => {
+const callGroqAnalysis = async (prompt, attempt = 1, useSmallModel = false) => {
+  const model = useSmallModel ? aiModelFallback : aiModel;
   try {
     const resp = await aiClient.chat.completions.create({
-      model:           aiModel,
+      model,
       messages: [
         { role: 'system', content: ANALYTICA_SYSTEM },
         { role: 'user',   content: prompt },
@@ -276,12 +277,17 @@ const callGroqAnalysis = async (prompt, attempt = 1) => {
     const is429 = (err.status || err?.response?.status || err?.httpStatus) === 429
       || msg.includes('[429') || msg.includes('429 too many') || msg.includes('resource_exhausted')
       || msg.includes('quota exceeded') || msg.includes('rate_limit') || msg.includes('too many requests');
-    // TPD: skip retries, go straight to Gemini
+    // RPM: retry with backoff
     if (is429 && !isTPD && attempt <= 2) {
       await sleep(attempt * 8000);
-      return callGroqAnalysis(prompt, attempt + 1);
+      return callGroqAnalysis(prompt, attempt + 1, useSmallModel);
     }
-    console.warn(`⚠️  Groq analysis ${isTPD ? 'TPD' : 'exhausted'} — falling back to Gemini`);
+    // TPD on primary model: try 8b fallback model (750K TPD)
+    if (is429 && isTPD && !useSmallModel) {
+      console.warn(`⚠️  Groq analysis ${aiModel} TPD — trying ${aiModelFallback} (750K TPD)`);
+      return callGroqAnalysis(prompt, 1, true);
+    }
+    console.warn(`⚠️  Groq analysis exhausted — falling back to Gemini`);
     return callGemini(ANALYTICA_SYSTEM, prompt, 3500, 0.75);
   }
 };

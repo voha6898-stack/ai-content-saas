@@ -1,4 +1,4 @@
-const { aiClient, aiModel, callGemini } = require('./ai.service');
+const { aiClient, aiModel, aiModelFallback, callGemini } = require('./ai.service');
 
 // YouTube 10/15min scripts route to Gemini (long-form, needs larger context)
 const GEMINI_DURATIONS = new Set(['10 phút', '15 phút']);
@@ -315,10 +315,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
 
-const callGroq = async (prompt, maxTokens, attempt = 1) => {
+const callGroq = async (prompt, maxTokens, attempt = 1, useSmallModel = false) => {
+  const model = useSmallModel ? aiModelFallback : aiModel;
   try {
     const resp = await aiClient.chat.completions.create({
-      model:           aiModel,
+      model,
       messages: [
         { role: 'system', content: SCRIPTA_SYSTEM },
         { role: 'user',   content: prompt },
@@ -333,17 +334,17 @@ const callGroq = async (prompt, maxTokens, attempt = 1) => {
     const is429  = (err.status || err?.response?.status || err?.httpStatus) === 429
       || msg429.includes('[429') || msg429.includes('429 too many') || msg429.includes('resource_exhausted')
       || msg429.includes('quota exceeded') || msg429.includes('rate_limit') || msg429.includes('too many requests');
-    // TPD (daily quota) — skip retries, go straight to Gemini
-    if (is429 && _isTPD(err)) {
-      console.warn('⚠️  SCRIPTA Groq TPD exhausted — Gemini fallback');
-      return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
+    // TPD on primary model — try 8b fallback (750K TPD)
+    if (is429 && _isTPD(err) && !useSmallModel) {
+      console.warn(`⚠️  SCRIPTA ${aiModel} TPD — trying ${aiModelFallback} (750K TPD)`);
+      return callGroq(prompt, maxTokens, 1, true);
     }
-    // RPM — retry with backoff then Gemini
-    if (is429 && attempt <= 2) {
+    // RPM — retry with backoff
+    if (is429 && !_isTPD(err) && attempt <= 2) {
       const wait = attempt * 8000;
       console.warn(`⚠️  SCRIPTA Groq RPM 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
       await sleep(wait);
-      return callGroq(prompt, maxTokens, attempt + 1);
+      return callGroq(prompt, maxTokens, attempt + 1, useSmallModel);
     }
     if (is429) {
       console.warn('⚠️  SCRIPTA Groq exhausted — Gemini fallback');
