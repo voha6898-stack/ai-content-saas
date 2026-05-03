@@ -21,22 +21,29 @@ else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Detect 429 from either Groq (err.status) or Gemini SDK (embedded in err.message)
+// Detect 429 / rate-limit from Groq (err.status) OR Gemini SDK (err.message)
 const _is429 = (err) => {
-  const status = err.status || err?.response?.status;
-  const msg    = err.message || '';
-  return status === 429 || msg.includes('[429') || msg.includes('429 Too Many');
+  const status = err.status || err?.response?.status || err?.httpStatus;
+  const msg    = (err.message || '').toLowerCase();
+  return status === 429
+    || msg.includes('[429')
+    || msg.includes('429 too many')
+    || msg.includes('resource_exhausted')
+    || msg.includes('quota exceeded')
+    || msg.includes('rate_limit_exceeded')
+    || msg.includes('rate limit')
+    || msg.includes('too many requests');
 };
 // Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
 
-// Direct Gemini call — tries gemini-2.0-flash then gemini-1.5-flash on 429
+const _busyError = (msg = 'AI đang bận tải cao, vui lòng thử lại sau 1 phút.') => {
+  const e = new Error(msg); e.statusCode = 503; return e;
+};
+
+// Direct Gemini call — tries gemini-2.0-flash then gemini-1.5-flash on 429, fails fast
 const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, modelIdx = 0) => {
-  if (!geminiClient) {
-    const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
-    e.statusCode = 503;
-    throw e;
-  }
+  if (!geminiClient) throw _busyError();
   const modelName = GEMINI_MODELS[modelIdx] || GEMINI_MODELS[0];
   try {
     const model = geminiClient.getGenerativeModel({
@@ -47,37 +54,21 @@ const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, m
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (err) {
-    // Try next Gemini model if 429
+    // Try next Gemini model if 429 and there is a next model
     if (_is429(err) && modelIdx < GEMINI_MODELS.length - 1) {
       console.warn(`⚠️  ${modelName} 429 — trying ${GEMINI_MODELS[modelIdx + 1]}`);
-      await _sleep(5000);
       return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature, modelIdx + 1);
     }
-    // All models exhausted — wait and retry last model once more
-    if (_is429(err)) {
-      console.warn(`⚠️  All Gemini models 429 — waiting 30s before final retry`);
-      await _sleep(30000);
-      try {
-        const m2 = geminiClient.getGenerativeModel({
-          model: modelName,
-          systemInstruction: systemPrompt,
-          generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
-        });
-        return (await m2.generateContent(userPrompt)).response.text();
-      } catch {
-        const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 2 phút.');
-        e.statusCode = 503;
-        throw e;
-      }
-    }
-    const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
-    e.statusCode = 503;
-    throw e;
+    // Log actual error for debugging before throwing
+    console.error(`❌ Gemini ${modelName} error [_is429=${_is429(err)}]: ${err.message?.substring(0, 200)}`);
+    if (_is429(err)) throw _busyError('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
+    throw _busyError();
   }
 };
 
-// Groq fallback helper — used when Gemini is unavailable or rate-limited
-const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) => {
+// Groq fallback helper
+// alreadyTriedGemini=true prevents re-entering Gemini when we know it's also 429
+const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature, alreadyTriedGemini = false) => {
   try {
     console.warn('⚠️  Routing to Groq fallback...');
     const resp = await client.chat.completions.create({
@@ -93,14 +84,18 @@ const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) =
     return resp.choices[0].message.content;
   } catch (err) {
     if (_is429(err)) {
-      console.warn(`⚠️  Groq quota exceeded (${_isTPD(err) ? 'TPD' : 'RPM'}) — Gemini last resort`);
+      const reason = _isTPD(err) ? 'TPD' : 'RPM';
+      console.warn(`⚠️  Groq quota exceeded (${reason})`);
+      // If we already tried Gemini (both 429) don't loop back — fail cleanly
+      if (alreadyTriedGemini) throw _busyError();
+      console.warn('⚠️  Groq TPD/RPM — Gemini last resort');
       return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature);
     }
     throw err;
   }
 };
 
-// callGemini — tries gemini-2.0-flash, then gemini-1.5-flash on 429, then Groq
+// callGemini — tries gemini-2.0-flash → gemini-1.5-flash on 429 → Groq fallback
 const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperature = 0.85, modelIdx = 0) => {
   // No Gemini key — route to Groq directly
   if (!geminiClient) {
@@ -120,12 +115,12 @@ const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperatur
     // Try next Gemini model on 429
     if (_is429(err) && modelIdx < GEMINI_MODELS.length - 1) {
       console.warn(`⚠️  ${modelName} 429 — trying ${GEMINI_MODELS[modelIdx + 1]}`);
-      await _sleep(3000);
       return callGemini(systemPrompt, userPrompt, maxTokens, temperature, modelIdx + 1);
     }
     // All Gemini models exhausted → fall back to Groq
-    console.warn(`⚠️  Gemini exhausted — falling back to Groq: ${err.message?.substring(0, 80)}`);
-    return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
+    // Pass alreadyTriedGemini=true to prevent circular Gemini→Groq→Gemini loop
+    console.warn(`⚠️  Gemini exhausted — falling back to Groq: ${err.message?.substring(0, 100)}`);
+    return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature, true);
   }
 };
 

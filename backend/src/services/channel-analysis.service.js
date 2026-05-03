@@ -272,7 +272,10 @@ const callGroqAnalysis = async (prompt, attempt = 1) => {
     return resp.choices[0].message.content;
   } catch (err) {
     const isTPD = (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
-    const is429 = (err.status || err?.response?.status) === 429 || (err.message || '').includes('[429');
+    const msg   = (err.message || '').toLowerCase();
+    const is429 = (err.status || err?.response?.status || err?.httpStatus) === 429
+      || msg.includes('[429') || msg.includes('429 too many') || msg.includes('resource_exhausted')
+      || msg.includes('quota exceeded') || msg.includes('rate_limit') || msg.includes('too many requests');
     // TPD: skip retries, go straight to Gemini
     if (is429 && !isTPD && attempt <= 2) {
       await sleep(attempt * 8000);

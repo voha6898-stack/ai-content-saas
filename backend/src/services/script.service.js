@@ -329,7 +329,10 @@ const callGroq = async (prompt, maxTokens, attempt = 1) => {
     });
     return resp.choices[0].message.content;
   } catch (err) {
-    const is429 = (err.status || err?.response?.status) === 429 || (err.message || '').includes('[429');
+    const msg429 = (err.message || '').toLowerCase();
+    const is429  = (err.status || err?.response?.status || err?.httpStatus) === 429
+      || msg429.includes('[429') || msg429.includes('429 too many') || msg429.includes('resource_exhausted')
+      || msg429.includes('quota exceeded') || msg429.includes('rate_limit') || msg429.includes('too many requests');
     // TPD (daily quota) — skip retries, go straight to Gemini
     if (is429 && _isTPD(err)) {
       console.warn('⚠️  SCRIPTA Groq TPD exhausted — Gemini fallback');
