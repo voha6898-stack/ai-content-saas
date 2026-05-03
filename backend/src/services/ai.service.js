@@ -12,11 +12,11 @@ const client = new OpenAI({ apiKey: cfg.apiKey, ...(cfg.baseURL && { baseURL: cf
 console.log(`🤖 AI Agent VIRA: ${PROVIDER.toUpperCase()} (${cfg.model})`);
 
 // ── Gemini Provider ────────────────────────────────────────────────────────────
-const GEMINI_MODEL  = 'gemini-2.0-flash';
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash']; // rotation on 429
 const geminiClient  = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
-if (geminiClient) console.log(`🤖 AI Agent GEMINI: ${GEMINI_MODEL} (active)`);
+if (geminiClient) console.log(`🤖 AI Agent GEMINI: ${GEMINI_MODELS[0]}/${GEMINI_MODELS[1]} (active)`);
 else              console.log(`⚠️  Gemini: GEMINI_API_KEY not set — Gemini features will fallback to Groq`);
 
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -30,26 +30,45 @@ const _is429 = (err) => {
 // Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
 
-// Direct Gemini call — last-resort, no recursion, with RPM retry
-const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, attempt = 1) => {
+// Direct Gemini call — tries gemini-2.0-flash then gemini-1.5-flash on 429
+const _geminiDirect = async (systemPrompt, userPrompt, maxTokens, temperature, modelIdx = 0) => {
   if (!geminiClient) {
     const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
     e.statusCode = 503;
     throw e;
   }
+  const modelName = GEMINI_MODELS[modelIdx] || GEMINI_MODELS[0];
   try {
     const model = geminiClient.getGenerativeModel({
-      model:            GEMINI_MODEL,
+      model:            modelName,
       systemInstruction: systemPrompt,
       generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
     });
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (err) {
-    if (_is429(err) && attempt <= 2) {
-      console.warn(`⚠️  Gemini last-resort 429 — retry ${attempt}/2 sau 20s`);
-      await _sleep(20000);
-      return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
+    // Try next Gemini model if 429
+    if (_is429(err) && modelIdx < GEMINI_MODELS.length - 1) {
+      console.warn(`⚠️  ${modelName} 429 — trying ${GEMINI_MODELS[modelIdx + 1]}`);
+      await _sleep(5000);
+      return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature, modelIdx + 1);
+    }
+    // All models exhausted — wait and retry last model once more
+    if (_is429(err)) {
+      console.warn(`⚠️  All Gemini models 429 — waiting 30s before final retry`);
+      await _sleep(30000);
+      try {
+        const m2 = geminiClient.getGenerativeModel({
+          model: modelName,
+          systemInstruction: systemPrompt,
+          generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+        });
+        return (await m2.generateContent(userPrompt)).response.text();
+      } catch {
+        const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 2 phút.');
+        e.statusCode = 503;
+        throw e;
+      }
     }
     const e = new Error('AI đang bận tải cao, vui lòng thử lại sau 1 phút.');
     e.statusCode = 503;
@@ -81,34 +100,31 @@ const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature) =
   }
 };
 
-// callGemini — used by growth.service and script.service for long-form content
-const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperature = 0.85, attempt = 1) => {
+// callGemini — tries gemini-2.0-flash, then gemini-1.5-flash on 429, then Groq
+const callGemini = async (systemPrompt, userPrompt, maxTokens = 5000, temperature = 0.85, modelIdx = 0) => {
   // No Gemini key — route to Groq directly
   if (!geminiClient) {
     return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
   }
 
+  const modelName = GEMINI_MODELS[modelIdx] || GEMINI_MODELS[0];
   try {
     const model = geminiClient.getGenerativeModel({
-      model:            GEMINI_MODEL,
+      model:            modelName,
       systemInstruction: systemPrompt,
-      generationConfig: {
-        temperature,
-        maxOutputTokens:  maxTokens,
-        responseMimeType: 'application/json',
-      },
+      generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
     });
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (err) {
-    if (_is429(err) && attempt <= 2) {
-      const wait = attempt * 8000;
-      console.warn(`⚠️  Gemini 429 — retry ${attempt}/2 sau ${wait / 1000}s`);
-      await _sleep(wait);
-      return callGemini(systemPrompt, userPrompt, maxTokens, temperature, attempt + 1);
+    // Try next Gemini model on 429
+    if (_is429(err) && modelIdx < GEMINI_MODELS.length - 1) {
+      console.warn(`⚠️  ${modelName} 429 — trying ${GEMINI_MODELS[modelIdx + 1]}`);
+      await _sleep(3000);
+      return callGemini(systemPrompt, userPrompt, maxTokens, temperature, modelIdx + 1);
     }
-    // Gemini exhausted or any other error → fall back to Groq silently
-    console.warn(`⚠️  Gemini failed — falling back to Groq: ${err.message?.substring(0, 100)}`);
+    // All Gemini models exhausted → fall back to Groq
+    console.warn(`⚠️  Gemini exhausted — falling back to Groq: ${err.message?.substring(0, 80)}`);
     return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature);
   }
 };
