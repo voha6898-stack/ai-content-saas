@@ -12,7 +12,7 @@ const client = new OpenAI({ apiKey: cfg.apiKey, ...(cfg.baseURL && { baseURL: cf
 console.log(`🤖 AI Agent VIRA: ${PROVIDER.toUpperCase()} (${cfg.model})`);
 
 // ── Gemini Provider ────────────────────────────────────────────────────────────
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash']; // rotation on 429
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite']; // rotation on 429 (gemini-1.5-flash deprecated)
 const geminiClient  = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
