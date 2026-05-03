@@ -46,6 +46,11 @@ const _is429 = (err) => {
 };
 // Detect daily token quota exhaustion (TPD) vs rate-per-minute (RPM)
 const _isTPD = (err) => (err.message || '').includes('tokens per day') || (err.message || '').includes('TPD:');
+// Detect "prompt too large for this model" — skip 8b fallback, go straight to Gemini
+const _isRequestTooLarge = (err) => {
+  const msg = (err.message || '').toLowerCase();
+  return msg.includes('request too large') || msg.includes('too large for model');
+};
 
 const _busyError = (msg = 'AI đang bận tải cao, vui lòng thử lại sau 1 phút.') => {
   const e = new Error(msg); e.statusCode = 503; return e;
@@ -104,9 +109,15 @@ const _groqFallback = async (systemPrompt, userPrompt, maxTokens, temperature, a
     });
     return resp.choices[0].message.content;
   } catch (err) {
+    // Prompt too large for 8b model — skip 8b entirely, go to Gemini
+    if (_isRequestTooLarge(err)) {
+      console.warn(`⚠️  Groq ${model} request too large — skipping to Gemini`);
+      if (alreadyTriedGemini) throw _busyError();
+      return _geminiDirect(systemPrompt, userPrompt, maxTokens, temperature);
+    }
     if (_is429(err)) {
       const reason = _isTPD(err) ? 'TPD' : 'RPM';
-      // If primary Groq model hit TPD, try fallback 8b model first (750K TPD)
+      // Primary 70b hit TPD → try 8b (but only for smaller prompts that fit 6K TPM)
       if (!useSmallModel && PROVIDER === 'groq') {
         console.warn(`⚠️  Groq ${cfg.model} ${reason} — trying ${GROQ_FALLBACK_MODEL} (750K TPD)`);
         return _groqFallback(systemPrompt, userPrompt, maxTokens, temperature, alreadyTriedGemini, true);
@@ -465,6 +476,15 @@ const generateContent = async (topic, platform, _attempt = 1, _useSmallModel = f
     return { output: parsed, tokensUsed: response.usage?.total_tokens || 0 };
 
   } catch (err) {
+    // 8b model can't handle large prompt — go straight to Gemini
+    if (_isRequestTooLarge(err)) {
+      console.warn(`⚠️  VIRA ${model} request too large — Gemini emergency fallback`);
+      const p = buildPrompt(topic, platform);
+      const raw = await _geminiDirect(VIRA_SYSTEM, p, maxTokens, 0.88);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.hashtags)) parsed.hashtags = [];
+      return { output: parsed, tokensUsed: 0 };
+    }
     if (_is429(err) && !_isTPD(err) && _attempt <= MAX) {
       const ms = Math.pow(2, _attempt) * 5000;
       console.warn(`⚠️  VIRA RPM 429 (${model}) — retry ${_attempt}/${MAX} sau ${ms / 1000}s`);

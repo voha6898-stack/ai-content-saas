@@ -282,6 +282,12 @@ const callGroqAnalysis = async (prompt, attempt = 1, useSmallModel = false) => {
       await sleep(attempt * 8000);
       return callGroqAnalysis(prompt, attempt + 1, useSmallModel);
     }
+    // Prompt too large for 8b — skip straight to Gemini
+    const tooLarge = (err.message || '').toLowerCase().includes('request too large') || (err.message || '').toLowerCase().includes('too large for model');
+    if (tooLarge) {
+      console.warn('⚠️  Groq analysis request too large — Gemini fallback');
+      return callGemini(ANALYTICA_SYSTEM, prompt, 3500, 0.75);
+    }
     // TPD on primary model: try 8b fallback model (750K TPD)
     if (is429 && isTPD && !useSmallModel) {
       console.warn(`⚠️  Groq analysis ${aiModel} TPD — trying ${aiModelFallback} (750K TPD)`);

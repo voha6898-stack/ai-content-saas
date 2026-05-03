@@ -334,6 +334,12 @@ const callGroq = async (prompt, maxTokens, attempt = 1, useSmallModel = false) =
     const is429  = (err.status || err?.response?.status || err?.httpStatus) === 429
       || msg429.includes('[429') || msg429.includes('429 too many') || msg429.includes('resource_exhausted')
       || msg429.includes('quota exceeded') || msg429.includes('rate_limit') || msg429.includes('too many requests');
+    // Prompt too large for 8b — skip straight to Gemini
+    const tooLarge = msg429.includes('request too large') || msg429.includes('too large for model');
+    if (tooLarge) {
+      console.warn('⚠️  SCRIPTA request too large for 8b — Gemini fallback');
+      return callGemini(SCRIPTA_SYSTEM, prompt, maxTokens, 0.88);
+    }
     // TPD on primary model — try 8b fallback (750K TPD)
     if (is429 && _isTPD(err) && !useSmallModel) {
       console.warn(`⚠️  SCRIPTA ${aiModel} TPD — trying ${aiModelFallback} (750K TPD)`);
