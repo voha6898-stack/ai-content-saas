@@ -20,6 +20,9 @@ const errorMiddleware    = require('./src/middlewares/error.middleware');
 
 const app = express();
 
+// Trust Railway's proxy (required for express-rate-limit to work with X-Forwarded-For)
+app.set('trust proxy', 1);
+
 // ── Security headers ──────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
